@@ -1,10 +1,10 @@
 package com.dartrack.data
 
 import com.dartrack.model.GameMode
-import com.dartrack.model.cricket.CricketState
-import com.dartrack.model.halfit.HalfItState
-import com.dartrack.model.x01.X01State
-import com.dartrack.model.x01.X01Stats
+import com.dartrack.model.CricketState
+import com.dartrack.model.HalfItState
+import com.dartrack.model.X01State
+import com.dartrack.model.X01Stats
 
 data class PlayerStats(
     val name: String,

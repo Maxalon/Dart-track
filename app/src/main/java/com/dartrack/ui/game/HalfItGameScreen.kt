@@ -27,9 +27,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.dartrack.data.GameRepository
-import com.dartrack.model.halfit.HALF_IT_ROUNDS
-import com.dartrack.model.halfit.HalfItState
-import com.dartrack.model.halfit.HalfItTarget
+import com.dartrack.model.HALF_IT_ROUNDS
+import com.dartrack.model.HalfItState
+import com.dartrack.model.HalfItTarget
 import com.dartrack.viewmodel.GameViewModel
 
 @Composable
