@@ -32,8 +32,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.dartrack.data.GameRepository
-import com.dartrack.model.x01.X01State
-import com.dartrack.model.x01.X01Stats
+import com.dartrack.model.X01State
+import com.dartrack.model.X01Stats
 import com.dartrack.viewmodel.GameViewModel
 
 @Composable

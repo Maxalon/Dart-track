@@ -1,7 +1,5 @@
-package com.dartrack.model.halfit
+package com.dartrack.model
 
-import com.dartrack.model.GamePlayer
-import com.dartrack.model.GameState
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 

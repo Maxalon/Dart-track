@@ -34,9 +34,9 @@ import com.dartrack.data.GameRecord
 import com.dartrack.data.GameRepository
 import com.dartrack.model.GameMode
 import com.dartrack.model.GamePlayer
-import com.dartrack.model.cricket.CricketState
-import com.dartrack.model.halfit.HalfItState
-import com.dartrack.model.x01.X01State
+import com.dartrack.model.CricketState
+import com.dartrack.model.HalfItState
+import com.dartrack.model.X01State
 import kotlinx.coroutines.launch
 import java.util.UUID
 

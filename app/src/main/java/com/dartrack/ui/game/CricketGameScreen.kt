@@ -38,9 +38,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.dartrack.data.GameRepository
-import com.dartrack.model.cricket.CRICKET_MARKS_TO_CLOSE
-import com.dartrack.model.cricket.CRICKET_TARGETS
-import com.dartrack.model.cricket.CricketState
+import com.dartrack.model.CRICKET_MARKS_TO_CLOSE
+import com.dartrack.model.CRICKET_TARGETS
+import com.dartrack.model.CricketState
 import com.dartrack.viewmodel.GameViewModel
 
 @Composable
