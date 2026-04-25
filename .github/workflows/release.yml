@@ -1,0 +1,86 @@
+name: Release APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-apk
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compute version
+        id: ver
+        run: |
+          COUNT=$(git rev-list --count HEAD)
+          TAG="v0.1.${COUNT}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version_name=0.1.${COUNT}" >> "$GITHUB_OUTPUT"
+          echo "version_code=${COUNT}" >> "$GITHUB_OUTPUT"
+          echo "Computed version: $TAG (code $COUNT)"
+
+      - name: Check if tag already exists
+        id: tagcheck
+        run: |
+          if git ls-remote --exit-code --tags origin "${{ steps.ver.outputs.tag }}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Tag ${{ steps.ver.outputs.tag }} already exists, skipping release."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up JDK 17
+        if: steps.tagcheck.outputs.exists == 'false'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        if: steps.tagcheck.outputs.exists == 'false'
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build release APK
+        if: steps.tagcheck.outputs.exists == 'false'
+        run: |
+          ./gradlew :app:assembleRelease \
+            -PversionName=${{ steps.ver.outputs.version_name }} \
+            -PversionCode=${{ steps.ver.outputs.version_code }} \
+            --stacktrace
+
+      - name: Stage APK with version in filename
+        if: steps.tagcheck.outputs.exists == 'false'
+        run: |
+          mkdir -p out
+          cp app/build/outputs/apk/release/app-release.apk \
+             "out/dart-track-${{ steps.ver.outputs.version_name }}.apk"
+          ls -la out
+
+      - name: Create tag
+        if: steps.tagcheck.outputs.exists == 'false'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "${{ steps.ver.outputs.tag }}" -m "Release ${{ steps.ver.outputs.tag }}"
+          git push origin "${{ steps.ver.outputs.tag }}"
+
+      - name: Create GitHub release
+        if: steps.tagcheck.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: ${{ steps.ver.outputs.tag }}
+          generate_release_notes: true
+          files: out/dart-track-${{ steps.ver.outputs.version_name }}.apk
