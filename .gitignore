@@ -1,0 +1,24 @@
+# Gradle
+.gradle/
+build/
+out/
+!gradle-wrapper.jar
+!gradle-wrapper.properties
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+local.properties
+captures/
+.cxx/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Keystores (debug.keystore is intentionally committed for stable signing)
+*.jks
+!app/debug.keystore

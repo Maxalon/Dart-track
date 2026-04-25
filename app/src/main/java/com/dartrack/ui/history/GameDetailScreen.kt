@@ -1,0 +1,188 @@
+package com.dartrack.ui.history
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Card
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.dartrack.data.GameRepository
+import com.dartrack.model.GameMode
+import com.dartrack.model.cricket.CRICKET_TARGETS
+import com.dartrack.model.cricket.CricketState
+import com.dartrack.model.halfit.HalfItState
+import com.dartrack.model.x01.X01State
+import com.dartrack.model.x01.X01Stats
+import kotlinx.coroutines.launch
+import java.text.DateFormat
+import java.util.Date
+
+@Composable
+fun GameDetailScreen(
+    recordId: String,
+    onBack: () -> Unit,
+) {
+    val context = LocalContext.current
+    val repo = remember { GameRepository.get(context) }
+    val games by repo.games.collectAsState()
+    val rec = games.firstOrNull { it.id == recordId }
+    val scope = rememberCoroutineScope()
+    var confirmDelete by remember { mutableStateOf(false) }
+
+    Column(
+        modifier = Modifier.fillMaxSize().padding(8.dp).verticalScroll(rememberScrollState()),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Game details", fontSize = 22.sp, fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f))
+            TextButton(onClick = onBack) { Text("Back") }
+        }
+        if (rec == null) {
+            Text("Game not found.", modifier = Modifier.padding(16.dp))
+            return
+        }
+        val df = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
+        Card(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text(when (rec.mode) {
+                    GameMode.X01 -> "X01"
+                    GameMode.CRICKET -> "Cricket"
+                    GameMode.HALF_IT -> "Half-It"
+                }, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                Text("Started: ${df.format(Date(rec.createdAtEpochMs))}")
+                Text("Updated: ${df.format(Date(rec.updatedAtEpochMs))}")
+                Text("Status: ${if (rec.isFinished) "finished" else "in progress"}")
+                if (rec.isFinished) Text("Winner: ${rec.winnerNames.joinToString()}",
+                    fontWeight = FontWeight.SemiBold)
+            }
+        }
+
+        when (val s = rec.state) {
+            is X01State -> X01Detail(s)
+            is CricketState -> CricketDetail(s)
+            is HalfItState -> HalfItDetail(s)
+        }
+
+        Spacer(Modifier.height(12.dp))
+        TextButton(onClick = { confirmDelete = true },
+            modifier = Modifier.padding(8.dp)) {
+            Text("Delete game", color = MaterialTheme.colorScheme.error)
+        }
+    }
+
+    if (confirmDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text("Delete this game?") },
+            text = { Text("This cannot be undone.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    scope.launch {
+                        repo.delete(recordId)
+                        confirmDelete = false
+                        onBack()
+                    }
+                }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDelete = false }) { Text("Cancel") }
+            },
+        )
+    }
+}
+
+@Composable
+private fun X01Detail(s: X01State) {
+    Card(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text("Start ${s.startScore}${if (s.doubleOut) " · double-out" else ""}",
+                fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(4.dp))
+            s.players.forEachIndexed { idx, p ->
+                val ps = s.perPlayer[idx]
+                Text(
+                    "${p.name}: avg ${"%.1f".format(X01Stats.threeDartAverage(ps, s.startScore))}" +
+                        " · best ${X01Stats.highestTurn(ps)}" +
+                        (X01Stats.checkout(ps)?.let { " · checkout $it" } ?: "") +
+                        " · darts ${ps.turns.size * 3}",
+                )
+                val turnSummary = ps.turns.joinToString(" · ") {
+                    if (it.bust) "BUST" else it.entered.toString()
+                }
+                if (turnSummary.isNotEmpty()) {
+                    Text(turnSummary, fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Spacer(Modifier.height(6.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun CricketDetail(s: CricketState) {
+    Card(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            s.players.forEachIndexed { idx, p ->
+                val ps = s.perPlayer[idx]
+                val cum = ps.cumulativeMarks()
+                Text("${p.name}: ${s.scoreFor(idx)} pts", fontWeight = FontWeight.SemiBold)
+                Text(
+                    CRICKET_TARGETS.joinToString("  ") { t ->
+                        val label = if (t == 25) "B" else t.toString()
+                        "$label:${cum[t] ?: 0}"
+                    },
+                    fontSize = 12.sp,
+                )
+                Text("Turns: ${ps.turns.size}", fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(6.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun HalfItDetail(s: HalfItState) {
+    Card(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            s.players.forEachIndexed { idx, p ->
+                val ps = s.perPlayer[idx]
+                Text("${p.name}: ${ps.total}", fontWeight = FontWeight.SemiBold)
+                if (ps.rounds.isNotEmpty()) {
+                    Text(
+                        ps.rounds.joinToString(" · ") { "+${it.pointsScored}=${it.totalAfter}" },
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Spacer(Modifier.height(6.dp))
+            }
+        }
+    }
+}
