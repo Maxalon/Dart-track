@@ -12,11 +12,14 @@ const val CRICKET_MARKS_TO_CLOSE = 3
  * Marks added per target on a single 3-dart turn. A "mark" is one segment hit
  * (single = 1, double = 2, triple = 3; bull = 1, double-bull = 2). Maximum
  * 9 marks total per turn (3 darts × triple).
+ *
+ * [pointsEarned] is captured at turn time so points stay permanent — once
+ * earned, they don't disappear later when an opponent closes the target.
  */
 @Serializable
 data class CricketTurn(
-    /** marksByTarget[target] = marks added this turn (0..3 per dart, max 9). */
     val marksByTarget: Map<Int, Int> = emptyMap(),
+    val pointsEarned: Int = 0,
 ) {
     val totalMarks: Int get() = marksByTarget.values.sum()
 }
@@ -40,6 +43,9 @@ data class CricketPlayerState(
         (cumulativeMarks()[target] ?: 0) >= CRICKET_MARKS_TO_CLOSE
 
     fun hasClosedAll(): Boolean = CRICKET_TARGETS.all { isClosed(it) }
+
+    /** Sum of points actually earned across all turns. Permanent. */
+    val score: Int get() = turns.sumOf { it.pointsEarned }
 }
 
 @Serializable
@@ -51,47 +57,48 @@ data class CricketState(
     override val winnerIndices: List<Int> = emptyList(),
 ) : GameState {
 
-    /**
-     * Score is computed: for each target, if you've closed it (>=3 marks) and
-     * at least one opponent has not, every additional mark on it counts as
-     * (target × marks-past-3) points.
-     */
-    fun scoreFor(playerIndex: Int): Int {
-        val me = perPlayer[playerIndex]
-        val cum = me.cumulativeMarks()
-        var total = 0
-        for (target in CRICKET_TARGETS) {
-            val mine = cum[target] ?: 0
-            if (mine <= CRICKET_MARKS_TO_CLOSE) continue
-            val opponentClosed = perPlayer
-                .filterIndexed { idx, _ -> idx != playerIndex }
-                .all { it.isClosed(target) }
-            if (opponentClosed) continue
-            total += (mine - CRICKET_MARKS_TO_CLOSE) * target
-        }
-        return total
-    }
+    fun scoreFor(playerIndex: Int): Int = perPlayer[playerIndex].score
 
     fun applyTurn(marksByTarget: Map<Int, Int>): CricketState {
         if (isFinished) return this
         require(marksByTarget.values.sum() in 0..9) { "max 9 marks (3 darts × triple)" }
         require(marksByTarget.keys.all { it in CRICKET_TARGETS }) { "invalid target" }
 
+        val me = perPlayer[currentPlayerIndex]
+        val cumBefore = me.cumulativeMarks()
+        var pointsEarned = 0
+        for ((target, marksThisTurn) in marksByTarget) {
+            if (marksThisTurn <= 0) continue
+            val before = cumBefore[target] ?: 0
+            val after = before + marksThisTurn
+            val scoringMarks =
+                (after - CRICKET_MARKS_TO_CLOSE).coerceAtLeast(0) -
+                (before - CRICKET_MARKS_TO_CLOSE).coerceAtLeast(0)
+            if (scoringMarks <= 0) continue
+            // Points score only if at least one opponent has not yet closed
+            // this target at the moment of the turn.
+            val anyOpponentOpen = perPlayer
+                .filterIndexed { idx, _ -> idx != currentPlayerIndex }
+                .any { !it.isClosed(target) }
+            if (anyOpponentOpen) pointsEarned += scoringMarks * target
+        }
+
+        val turn = CricketTurn(
+            marksByTarget = marksByTarget.filterValues { v -> v > 0 },
+            pointsEarned = pointsEarned,
+        )
         val updated = perPlayer.toMutableList().also {
-            val cur = it[currentPlayerIndex]
-            it[currentPlayerIndex] = cur.copy(
-                turns = cur.turns + CricketTurn(marksByTarget.filterValues { v -> v > 0 })
-            )
+            it[currentPlayerIndex] = me.copy(turns = me.turns + turn)
         }
         val newState = copy(perPlayer = updated)
 
-        // Win condition: all targets closed AND score >= every opponent's score.
-        val me = updated[currentPlayerIndex]
-        val newWinners = if (me.hasClosedAll()) {
-            val myScore = newState.scoreFor(currentPlayerIndex)
+        // Win: all targets closed AND score ≥ every opponent's score.
+        val newMe = updated[currentPlayerIndex]
+        val newWinners = if (newMe.hasClosedAll()) {
+            val myScore = newMe.score
             val leadsOrTies = updated.indices
                 .filter { it != currentPlayerIndex }
-                .all { newState.scoreFor(it) <= myScore }
+                .all { updated[it].score <= myScore }
             if (leadsOrTies) winnerIndices + currentPlayerIndex else winnerIndices
         } else winnerIndices
 

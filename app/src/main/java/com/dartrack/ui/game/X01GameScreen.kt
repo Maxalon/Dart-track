@@ -40,6 +40,7 @@ import com.dartrack.viewmodel.GameViewModel
 fun X01GameScreen(
     recordId: String,
     onExit: () -> Unit,
+    onRematch: () -> Unit,
 ) {
     val context = LocalContext.current
     val repo = remember { GameRepository.get(context) }
@@ -134,18 +135,12 @@ fun X01GameScreen(
         Spacer(Modifier.weight(1f))
 
         if (state.isFinished) {
-            Card(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        "Winner: ${state.winnerIndices.joinToString { state.players[it].name }}",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    TextButton(onClick = onExit) { Text("Back to home") }
-                    TextButton(onClick = { vm.undoX01() }) { Text("Undo last turn") }
-                }
-            }
+            EndOfGameActions(
+                winnerLabel = state.winnerIndices.joinToString { state.players[it].name },
+                onExit = onExit,
+                onRematch = onRematch,
+                onUndo = { vm.undoX01() },
+            )
         } else {
             ScoreNumpad(
                 entry = entry,

@@ -57,18 +57,29 @@ fun AppRoot() {
                 LaunchedEffect(Unit) { nav.popBackStack() }
                 return@composable
             }
+            val onRematch: () -> Unit = {
+                appVm.rematch(record) { newId ->
+                    nav.navigate("game/$newId") {
+                        popUpTo("home")
+                    }
+                }
+            }
+            val onExit: () -> Unit = { nav.popBackStack("home", inclusive = false) }
             when (record.mode) {
                 com.dartrack.model.GameMode.X01 -> X01GameScreen(
                     recordId = id,
-                    onExit = { nav.popBackStack("home", inclusive = false) },
+                    onExit = onExit,
+                    onRematch = onRematch,
                 )
                 com.dartrack.model.GameMode.CRICKET -> CricketGameScreen(
                     recordId = id,
-                    onExit = { nav.popBackStack("home", inclusive = false) },
+                    onExit = onExit,
+                    onRematch = onRematch,
                 )
                 com.dartrack.model.GameMode.HALF_IT -> HalfItGameScreen(
                     recordId = id,
-                    onExit = { nav.popBackStack("home", inclusive = false) },
+                    onExit = onExit,
+                    onRematch = onRematch,
                 )
             }
         }
