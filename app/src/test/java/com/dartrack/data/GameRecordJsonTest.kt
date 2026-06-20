@@ -96,6 +96,44 @@ class GameRecordJsonTest {
     }
 
     @Test
+    fun legacyX01Json_withoutMatchFields_decodesToSingleLeg() {
+        // Simulates a game persisted BEFORE the match-play feature: no
+        // legsToWin / legWins / startingPlayerIndex / completedLegs fields.
+        val legacy = """
+            {"id":"old","mode":"X01","createdAtEpochMs":1,"updatedAtEpochMs":2,
+             "state":{"type":"x01",
+               "players":[{"name":"Alice"},{"name":"Bob"}],
+               "perPlayer":[{"player":{"name":"Alice"},"turns":[]},
+                            {"player":{"name":"Bob"},"turns":[]}],
+               "startScore":501,"doubleOut":true,
+               "currentPlayerIndex":0,"winnerIndices":[]}}
+        """.trimIndent()
+        val decoded = json.decodeFromString(GameRecord.serializer(), legacy)
+        val state = decoded.state as X01State
+        assertEquals(1, state.legsToWin, "defaults to single leg")
+        assertTrue(state.legWins.isEmpty())
+        assertEquals(0, state.startingPlayerIndex)
+        assertTrue(state.completedLegs.isEmpty())
+        assertEquals(0, state.legsWonBy(0), "empty legWins treated as zeros")
+        // Still fully playable from the legacy state.
+        val after = state.applyTurn(60)
+        assertEquals(441, after.scoreFor(0))
+    }
+
+    @Test
+    fun x01MatchRecord_roundTrips() {
+        var state = X01State.new(players, startScore = 40, doubleOut = false, legsToWin = 2)
+        state = state.applyTurn(40) // Alice wins leg 1; leg 2 begins
+        val record = GameRecord("match-1", GameMode.X01, 1L, 2L, state)
+        val decoded = roundTrip(record)
+        assertEquals(record, decoded)
+        val s = decoded.state as X01State
+        assertEquals(2, s.legsToWin)
+        assertEquals(1, s.completedLegs.size)
+        assertEquals(1, s.legsWonBy(0))
+    }
+
+    @Test
     fun finishedX01Record_preservesWinner() {
         val state = X01State.new(players, startScore = 40, doubleOut = false)
             .applyTurn(40) // Alice finishes

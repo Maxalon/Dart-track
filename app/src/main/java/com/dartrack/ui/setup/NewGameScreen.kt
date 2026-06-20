@@ -53,6 +53,7 @@ fun NewGameScreen(
     var mode by remember { mutableStateOf(GameMode.X01) }
     var startScore by remember { mutableStateOf(501) }
     var doubleOut by remember { mutableStateOf(true) }
+    var legsToWin by remember { mutableStateOf(1) }
     val playerNames = remember { mutableStateListOf("Player 1", "Player 2") }
 
     Column(
@@ -95,6 +96,17 @@ fun NewGameScreen(
                 Spacer(Modifier.height(0.dp))
                 Text("  Finish on a double (double-out)")
             }
+            Spacer(Modifier.height(16.dp))
+            Text("Legs (first to)", fontWeight = FontWeight.SemiBold)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                X01State.SUPPORTED_LEGS.forEach { n ->
+                    FilterChip(
+                        selected = legsToWin == n,
+                        onClick = { legsToWin = n },
+                        label = { Text(if (n == 1) "Single leg" else "First to $n") },
+                    )
+                }
+            }
         }
 
         Spacer(Modifier.height(16.dp))
@@ -132,7 +144,7 @@ fun NewGameScreen(
                         .map { it.trim().ifBlank { "Player" } }
                         .map { GamePlayer(it) }
                     val state = when (mode) {
-                        GameMode.X01 -> X01State.new(players, startScore, doubleOut)
+                        GameMode.X01 -> X01State.new(players, startScore, doubleOut, legsToWin)
                         GameMode.CRICKET -> CricketState.new(players)
                         GameMode.HALF_IT -> HalfItState.new(players)
                         GameMode.AROUND_CLOCK -> AroundTheClockState.new(players)
