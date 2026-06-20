@@ -334,3 +334,99 @@ fun playerStats(playerId: String, games: List<GameRecord>): PlayerStatsData {
         catch40 = ModeSummary(catchPlayed, catchWon, best = catchHigh),
     )
 }
+
+/**
+ * Chronological 3-dart-average trend for the player identified by [playerId].
+ *
+ * This is the id-keyed counterpart to [TrendStats.threeDartAverageTrend] (which
+ * keys by display name): the player's seat in each game is the first index `i`
+ * where `state.players[i].id == playerId`. One [TrendPoint] is produced per
+ * FINISHED X01 game the player took part in, using that player's 3-dart average
+ * across all of their legs in the game (via [X01State.allLegStatesFor] +
+ * [X01Stats.threeDartAverage]). The game's own [X01State.startScore] is used.
+ *
+ * Games where the player threw zero darts are skipped (the average would be 0.0
+ * and would distort the line). A blank [playerId] never matches any seat, so an
+ * empty list is returned. Points are ordered oldest-to-newest by
+ * [GameRecord.createdAtEpochMs] (the repository hands lists sorted by updatedAt,
+ * so an explicit sort is required for correctness). Reuses the [TrendPoint] type
+ * declared in TrendStats.kt.
+ */
+fun threeDartAvgTrendById(playerId: String, games: List<GameRecord>): List<TrendPoint> {
+    if (playerId.isBlank()) return emptyList()
+    val points = ArrayList<TrendPoint>()
+    for (r in games) {
+        if (!r.isFinished) continue
+        val state = r.state as? X01State ?: continue
+        val idx = state.players.indexOfFirst { it.id == playerId }
+        if (idx < 0) continue
+        val legStates = state.allLegStatesFor(idx)
+        // Skip games the player did not actually throw in.
+        if (legStates.all { it.turns.isEmpty() }) continue
+        val avg = X01Stats.threeDartAverage(legStates, state.startScore)
+        points.add(TrendPoint(timeMs = r.createdAtEpochMs, threeDartAvg = avg))
+    }
+    points.sortBy { it.timeMs }
+    return points
+}
+
+/**
+ * Head-to-head record for [playerId] against a single opponent: across every
+ * game that included BOTH players (any mode), how many were [played], [won] by
+ * the player, and [lost] (the opponent won and the player did not).
+ */
+data class H2HRecord(
+    val opponentId: String,
+    val opponentName: String,
+    val played: Int,
+    val won: Int,
+    val lost: Int,
+)
+
+/**
+ * Head-to-head records for [playerId] vs every other player they have shared a
+ * game with, across ALL modes.
+ *
+ * A game counts toward an opponent only when BOTH the player and that opponent
+ * occupy a seat (matched by stable id). For each shared game:
+ *  - [H2HRecord.won]  += 1 when [playerId] is in `winnerIndices` and the
+ *    opponent is NOT.
+ *  - [H2HRecord.lost] += 1 when the opponent is in `winnerIndices` and the
+ *    player is NOT.
+ *  - Ties / both-win / neither-win count toward neither (only [played]).
+ *
+ * Opponents are keyed by id; the most-recently-seen display name is reported.
+ * A blank [playerId] yields an empty list. Sorted by [H2HRecord.played] desc,
+ * then by opponent name (case-insensitive) asc. Pure and unit-testable.
+ */
+fun headToHead(playerId: String, games: List<GameRecord>): List<H2HRecord> {
+    if (playerId.isBlank()) return emptyList()
+
+    data class Acc(var name: String, var played: Int = 0, var won: Int = 0, var lost: Int = 0)
+    // Preserve first-seen order for stable sorting of equal keys.
+    val byOpponent = LinkedHashMap<String, Acc>()
+
+    for (r in games) {
+        val seats = r.state.players
+        val myIdx = seats.indexOfFirst { it.id == playerId }
+        if (myIdx < 0) continue
+        val winners = r.state.winnerIndices
+        val iWon = winners.contains(myIdx)
+
+        seats.forEachIndexed { oppIdx, opp ->
+            if (oppIdx == myIdx) return@forEachIndexed
+            if (opp.id.isBlank() || opp.id == playerId) return@forEachIndexed
+            val oppWon = winners.contains(oppIdx)
+            val acc = byOpponent.getOrPut(opp.id) { Acc(opp.name) }
+            acc.name = opp.name
+            acc.played++
+            if (iWon && !oppWon) acc.won++
+            if (oppWon && !iWon) acc.lost++
+        }
+    }
+
+    return byOpponent.entries
+        .map { (id, a) -> H2HRecord(id, a.name, a.played, a.won, a.lost) }
+        .sortedWith(compareByDescending<H2HRecord> { it.played }
+            .thenBy { it.opponentName.lowercase() })
+}
