@@ -11,9 +11,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.VolumeOff
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -22,6 +27,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -54,6 +60,29 @@ fun X01GameScreen(
     var entry by remember { mutableStateOf("") }
     var pendingFinish by remember { mutableStateOf<Int?>(null) }
 
+    val caller = rememberCaller()
+    var callerOn by rememberSaveable { mutableStateOf(false) }
+
+    // Announce an X01 turn. Outcome is derived from the same pure rules the model
+    // uses (see X01State.applyTurn) without mutating any state.
+    fun announceX01(entered: Int, finishedOnDouble: Boolean) {
+        if (!callerOn) return
+        val before = state.currentPlayerScore()
+        val after = before - entered
+        val bust = when {
+            after < 0 -> true
+            after == 0 && state.doubleOut && !finishedOnDouble -> true
+            after == 1 && state.doubleOut -> true
+            else -> false
+        }
+        val text = when {
+            bust -> "No score, bust"
+            after == 0 -> "scored $entered, game shot!"
+            else -> "scored $entered, $after remaining"
+        }
+        caller.speak(text, callerOn)
+    }
+
     Column(modifier = Modifier.fillMaxSize().padding(8.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
@@ -65,6 +94,12 @@ fun X01GameScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.weight(1f),
             )
+            IconButton(onClick = { callerOn = !callerOn }) {
+                Icon(
+                    if (callerOn) Icons.Default.VolumeUp else Icons.Default.VolumeOff,
+                    contentDescription = if (callerOn) "Mute caller" else "Enable caller",
+                )
+            }
             TextButton(onClick = onExit) { Text("Exit") }
         }
 
@@ -169,6 +204,7 @@ fun X01GameScreen(
                     if (state.doubleOut && wouldFinish) {
                         pendingFinish = v
                     } else {
+                        announceX01(v, finishedOnDouble = !state.doubleOut)
                         vm.applyX01Turn(v, finishedOnDouble = !state.doubleOut)
                         entry = ""
                     }
@@ -188,6 +224,7 @@ fun X01GameScreen(
             },
             confirmButton = {
                 TextButton(onClick = {
+                    announceX01(v, finishedOnDouble = true)
                     vm.applyX01Turn(v, finishedOnDouble = true)
                     pendingFinish = null
                     entry = ""
@@ -195,6 +232,7 @@ fun X01GameScreen(
             },
             dismissButton = {
                 TextButton(onClick = {
+                    announceX01(v, finishedOnDouble = false)
                     vm.applyX01Turn(v, finishedOnDouble = false)
                     pendingFinish = null
                     entry = ""
