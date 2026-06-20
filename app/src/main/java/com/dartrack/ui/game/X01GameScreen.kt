@@ -236,7 +236,9 @@ fun X01GameScreen(
 
         // ---- Compact mid strip (checkout chip) + bottom controls. --------
         if (state.isFinished) {
-            ElevatedCard(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
+            ElevatedCard(
+                modifier = Modifier.fillMaxWidth().padding(8.dp).navigationBarsPadding()
+            ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
                         (if (state.isMatch) "Match winner: " else "Winner: ") +
