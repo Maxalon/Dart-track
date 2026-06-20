@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dartrack.data.GameRepository
 import com.dartrack.data.StatsAggregator
+import com.dartrack.data.TrendStats
 
 @Composable
 fun StatsScreen(onBack: () -> Unit) {
@@ -76,6 +77,23 @@ fun StatsScreen(onBack: () -> Unit) {
                                     "${s.x01BestLegDarts} darts" else "—"
                                 Text("Best leg: $bestLeg · " +
                                     "avg darts/leg ${"%.1f".format(s.x01AvgDartsPerLeg)}")
+
+                                val trend = remember(games, s.name) {
+                                    TrendStats.threeDartAverageTrend(games, s.name)
+                                }
+                                if (trend.isNotEmpty()) {
+                                    Spacer(Modifier.height(8.dp))
+                                    Text(
+                                        "3-dart average trend",
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.primary,
+                                    )
+                                    Spacer(Modifier.height(4.dp))
+                                    TrendChart(
+                                        points = trend,
+                                        modifier = Modifier.fillMaxWidth(),
+                                    )
+                                }
                             }
                             if (s.cricketGamesPlayed > 0) {
                                 Text("Cricket: ${s.cricketGamesPlayed} games · " +
