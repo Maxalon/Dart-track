@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.dartrack.data.GameRepository
+import com.dartrack.model.Checkout
 import com.dartrack.model.X01State
 import com.dartrack.model.X01Stats
 import com.dartrack.viewmodel.GameViewModel
@@ -147,6 +148,18 @@ fun X01GameScreen(
                 }
             }
         } else {
+            val routes = Checkout.suggest(state.currentPlayerScore(), state.doubleOut)
+            if (routes.isNotEmpty()) {
+                Text(
+                    "Checkout: " + routes.take(2).joinToString(" · "),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 4.dp),
+                )
+            }
             ScoreNumpad(
                 entry = entry,
                 onEntryChange = { entry = it },
