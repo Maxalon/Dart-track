@@ -1,6 +1,7 @@
 package com.dartrack.data
 
 import com.dartrack.model.GameMode
+import com.dartrack.model.AroundTheClockState
 import com.dartrack.model.CricketState
 import com.dartrack.model.HalfItState
 import com.dartrack.model.X01State
@@ -152,6 +153,9 @@ object StatsAggregator {
                     halfItPlayed++
                     halfItHigh = maxOf(halfItHigh, s.perPlayer[idx].total)
                 }
+                // Around the Clock statistics are out of scope for now; the
+                // branch only exists to keep this `when` exhaustive.
+                is AroundTheClockState -> {}
             }
         }
 
