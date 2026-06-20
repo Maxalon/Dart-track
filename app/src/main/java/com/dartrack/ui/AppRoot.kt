@@ -10,6 +10,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.dartrack.data.GameRepository
+import com.dartrack.ui.game.AroundTheClockScreen
 import com.dartrack.ui.game.CricketGameScreen
 import com.dartrack.ui.game.HalfItGameScreen
 import com.dartrack.ui.game.X01GameScreen
@@ -67,6 +68,10 @@ fun AppRoot() {
                     onExit = { nav.popBackStack("home", inclusive = false) },
                 )
                 com.dartrack.model.GameMode.HALF_IT -> HalfItGameScreen(
+                    recordId = id,
+                    onExit = { nav.popBackStack("home", inclusive = false) },
+                )
+                com.dartrack.model.GameMode.AROUND_CLOCK -> AroundTheClockScreen(
                     recordId = id,
                     onExit = { nav.popBackStack("home", inclusive = false) },
                 )

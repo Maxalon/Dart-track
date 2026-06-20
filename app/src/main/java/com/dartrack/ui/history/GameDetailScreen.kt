@@ -30,6 +30,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dartrack.data.GameRepository
 import com.dartrack.model.GameMode
+import com.dartrack.model.AROUND_CLOCK_LAST_TARGET
+import com.dartrack.model.AroundTheClockState
 import com.dartrack.model.CRICKET_TARGETS
 import com.dartrack.model.CricketState
 import com.dartrack.model.HalfItState
@@ -73,6 +75,7 @@ fun GameDetailScreen(
                     GameMode.X01 -> "X01"
                     GameMode.CRICKET -> "Cricket"
                     GameMode.HALF_IT -> "Half-It"
+                    GameMode.AROUND_CLOCK -> "Around the Clock"
                 }, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                 Text("Started: ${df.format(Date(rec.createdAtEpochMs))}")
                 Text("Updated: ${df.format(Date(rec.updatedAtEpochMs))}")
@@ -86,6 +89,7 @@ fun GameDetailScreen(
             is X01State -> X01Detail(s)
             is CricketState -> CricketDetail(s)
             is HalfItState -> HalfItDetail(s)
+            is AroundTheClockState -> AroundTheClockDetail(s)
         }
 
         Spacer(Modifier.height(12.dp))
@@ -161,6 +165,30 @@ private fun CricketDetail(s: CricketState) {
                 )
                 Text("Turns: ${ps.turns.size}", fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(6.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun AroundTheClockDetail(s: AroundTheClockState) {
+    Card(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            s.players.forEachIndexed { idx, p ->
+                val ps = s.perPlayer[idx]
+                Text(
+                    "${p.name}: ${ps.cleared}/$AROUND_CLOCK_LAST_TARGET" +
+                        if (ps.finished) " · ${ps.darts} darts" else "",
+                    fontWeight = FontWeight.SemiBold,
+                )
+                if (ps.turns.isNotEmpty()) {
+                    Text(
+                        ps.turns.joinToString(" · ") { it.hits.toString() },
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 Spacer(Modifier.height(6.dp))
             }
         }

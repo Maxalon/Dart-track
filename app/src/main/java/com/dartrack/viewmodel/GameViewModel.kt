@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.dartrack.data.GameRecord
 import com.dartrack.data.GameRepository
 import com.dartrack.model.GameState
+import com.dartrack.model.AroundTheClockState
 import com.dartrack.model.CricketState
 import com.dartrack.model.HalfItState
 import com.dartrack.model.X01State
@@ -60,6 +61,11 @@ class GameViewModel(
         mutate { (it as HalfItState).applyTurn(points) }
 
     fun undoHalfIt() = mutate { (it as HalfItState).undoLast() }
+
+    fun applyAroundClockTurn(hits: Int) =
+        mutate { (it as AroundTheClockState).applyTurn(hits) }
+
+    fun undoAroundClock() = mutate { (it as AroundTheClockState).undoLast() }
 
     class Factory(
         private val repo: GameRepository,
