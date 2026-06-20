@@ -38,6 +38,7 @@ import com.dartrack.model.AroundTheClockState
 import com.dartrack.model.BobsTwentySevenState
 import com.dartrack.model.CricketState
 import com.dartrack.model.HalfItState
+import com.dartrack.model.ShanghaiState
 import com.dartrack.model.X01State
 import kotlinx.coroutines.launch
 import java.util.UUID
@@ -76,6 +77,7 @@ fun NewGameScreen(
                         GameMode.HALF_IT -> "Half-It"
                         GameMode.AROUND_CLOCK -> "Around the Clock"
                         GameMode.BOBS_27 -> "Bob's 27"
+                        GameMode.SHANGHAI -> "Shanghai"
                     }) },
                 )
             }
@@ -166,6 +168,7 @@ fun NewGameScreen(
                         GameMode.HALF_IT -> HalfItState.new(players)
                         GameMode.AROUND_CLOCK -> AroundTheClockState.new(players)
                         GameMode.BOBS_27 -> BobsTwentySevenState.new(players)
+                        GameMode.SHANGHAI -> ShanghaiState.new(players)
                     }
                     val now = System.currentTimeMillis()
                     val record = GameRecord(

@@ -6,6 +6,7 @@ import com.dartrack.model.AroundTheClockState
 import com.dartrack.model.BobsTwentySevenState
 import com.dartrack.model.CricketState
 import com.dartrack.model.HalfItState
+import com.dartrack.model.ShanghaiState
 import com.dartrack.model.X01State
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -41,4 +42,5 @@ fun GameState.toMode(): GameMode = when (this) {
     is HalfItState -> GameMode.HALF_IT
     is AroundTheClockState -> GameMode.AROUND_CLOCK
     is BobsTwentySevenState -> GameMode.BOBS_27
+    is ShanghaiState -> GameMode.SHANGHAI
 }

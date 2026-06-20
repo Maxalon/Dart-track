@@ -5,6 +5,7 @@ import com.dartrack.model.AroundTheClockState
 import com.dartrack.model.BobsTwentySevenState
 import com.dartrack.model.CricketState
 import com.dartrack.model.HalfItState
+import com.dartrack.model.ShanghaiState
 import com.dartrack.model.X01State
 import com.dartrack.model.X01Stats
 
@@ -187,6 +188,9 @@ object StatsAggregator {
                 // Bob's 27 statistics are out of scope for now; the branch only
                 // exists to keep this `when` exhaustive.
                 is BobsTwentySevenState -> {}
+                // Shanghai statistics are out of scope for now; the branch only
+                // exists to keep this `when` exhaustive.
+                is ShanghaiState -> {}
             }
         }
 
