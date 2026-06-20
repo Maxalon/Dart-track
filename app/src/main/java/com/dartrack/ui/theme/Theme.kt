@@ -73,11 +73,16 @@ private val Light = lightColorScheme(
  */
 private val Dark = darkColorScheme(
     primary = Red500,
-    onPrimary = Red950,
+    // Red950-on-Red500 was 4.29:1 (below AA 4.5:1). Near-black text label keeps
+    // the vivid #EF4444 primary fill identical while reaching 5.58:1.
+    onPrimary = Black,
     primaryContainer = Red800,
     onPrimaryContainer = Red100,
 
-    secondary = Slate400,
+    // Winner card. Slate400 (#94A3B8) read washed-out and only hit 6.96:1; the
+    // brighter Slate300 (#CBD5E1) makes the celebratory card pop and reaches
+    // 12.02:1 with the same dark on-token, well clear of AA.
+    secondary = Slate300,
     onSecondary = Slate900,
     secondaryContainer = Slate700,
     onSecondaryContainer = Slate100,

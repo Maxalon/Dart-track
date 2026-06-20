@@ -109,7 +109,12 @@ fun X01GameScreen(
         ) {
             Text(
                 "X01 · start ${state.startScore}${if (state.doubleOut) " · DO" else ""}" +
-                    if (state.isMatch) " · first to ${state.legsToWin} legs" else "",
+                    when {
+                        state.setsToWin > 1 ->
+                            " · first to ${state.setsToWin} sets · ${state.legsToWin} legs/set"
+                        state.legsToWin > 1 -> " · first to ${state.legsToWin} legs"
+                        else -> ""
+                    },
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.weight(1f),
@@ -169,7 +174,12 @@ fun X01GameScreen(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             p.name +
-                                (if (state.isMatch) "  (${state.legsWonBy(idx)} legs)" else "") +
+                                (when {
+                                    state.setsToWin > 1 ->
+                                        "  (${state.setsWonBy(idx)} sets · ${state.legsWonBy(idx)} legs)"
+                                    state.isMatch -> "  (${state.legsWonBy(idx)} legs)"
+                                    else -> ""
+                                }) +
                                 (if (isWinner) "  🏆" else ""),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = if (active) FontWeight.Bold else FontWeight.SemiBold,
@@ -232,9 +242,15 @@ fun X01GameScreen(
                     Text(
                         (if (state.isMatch) "Match winner: " else "Winner: ") +
                             state.winnerIndices.joinToString { state.players[it].name } +
-                            if (state.isMatch) "  (${state.winnerIndices.joinToString {
-                                state.legsWonBy(it).toString()
-                            }} legs)" else "",
+                            when {
+                                state.setsToWin > 1 -> "  (${state.winnerIndices.joinToString {
+                                    "${state.setsWonBy(it)} sets · ${state.legsWonBy(it)} legs"
+                                }})"
+                                state.isMatch -> "  (${state.winnerIndices.joinToString {
+                                    state.legsWonBy(it).toString()
+                                }} legs)"
+                                else -> ""
+                            },
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
                     )
@@ -350,6 +366,23 @@ private fun LegScoreboard(state: X01State) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
+            if (state.setsToWin > 1) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "Sets",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        state.players.indices.joinToString("  –  ") {
+                            state.setsWonBy(it).toString()
+                        },
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     "Legs",
@@ -366,7 +399,8 @@ private fun LegScoreboard(state: X01State) {
                 )
             }
             Text(
-                "Leg ${state.completedLegs.size + 1}",
+                if (state.setsToWin > 1) "Set ${state.setWins.sum() + 1} · Leg ${state.legWins.sum() + 1}"
+                else "Leg ${state.completedLegs.size + 1}",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

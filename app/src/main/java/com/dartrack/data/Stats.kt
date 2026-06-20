@@ -34,6 +34,8 @@ data class PlayerStats(
     val x01AvgDartsPerLeg: Double,
     /** Total X01 legs won (across all completed legs + finished current legs). */
     val x01LegsWon: Int,
+    /** Total X01 sets won across all matches. */
+    val x01SetsWon: Int,
     /** X01 matches (games) won. */
     val x01MatchesWon: Int,
     // Cricket
@@ -97,6 +99,7 @@ object StatsAggregator {
         var bestLegDarts = 0
         var x01Legs = 0
         var x01LegsWon = 0
+        var x01SetsWon = 0
         var x01MatchesWon = 0
 
         for (r in records) {
@@ -109,6 +112,9 @@ object StatsAggregator {
                 is X01State -> {
                     x01Played++
                     if (s.winnerIndices.contains(idx)) x01MatchesWon++
+                    // Sets won in this match (current-set count already includes
+                    // the deciding set on a finished match — applyTurn keeps it).
+                    x01SetsWon += s.setsWonBy(idx)
 
                     // Aggregate across EVERY leg this player played: each
                     // completed leg's snapshot plus the in-progress current leg.
@@ -206,6 +212,7 @@ object StatsAggregator {
             x01BestLegDarts = bestLegDarts,
             x01AvgDartsPerLeg = avgDartsPerLeg,
             x01LegsWon = x01LegsWon,
+            x01SetsWon = x01SetsWon,
             x01MatchesWon = x01MatchesWon,
             cricketGamesPlayed = cricketPlayed,
             cricketGamesWon = cricketWon,

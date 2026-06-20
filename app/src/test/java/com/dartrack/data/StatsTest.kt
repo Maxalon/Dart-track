@@ -5,7 +5,7 @@ import com.dartrack.model.GamePlayer
 import com.dartrack.model.X01PlayerState
 import com.dartrack.model.X01State
 import com.dartrack.model.X01Turn
-import org.junit.Assert.assertEquals
+import kotlin.test.assertEquals
 import org.junit.Test
 
 /**
@@ -173,6 +173,38 @@ class StatsTest {
         val turns = listOf(turn(501, 100), turn(401, 100))
         val stats = StatsAggregator.statsFor("A", listOf(x01Record("A", turns, won = false)))
         assertEquals(0, stats.x01BestLegDarts)
+    }
+
+    @Test
+    fun setsWon_accumulatesAcrossMatch() {
+        // first-to-2 legs/set, first-to-2 sets. A wins both sets (4 legs) -> 2 sets.
+        val players = listOf(GamePlayer("A"), GamePlayer("B"))
+        var s = X01State.new(players, startScore = 40, doubleOut = false,
+            legsToWin = 2, setsToWin = 2)
+        fun aLeg(st: X01State): X01State {
+            var x = st
+            if (x.currentPlayerIndex != 0) x = x.applyTurn(0)
+            return x.applyTurn(40)
+        }
+        s = aLeg(s); s = aLeg(s)   // set 1 to A
+        s = aLeg(s); s = aLeg(s)   // set 2 to A -> match
+        val record = GameRecord("setmatch", GameMode.X01, 0L, 0L, s)
+        val statsA = StatsAggregator.statsFor("A", listOf(record))
+        val statsB = StatsAggregator.statsFor("B", listOf(record))
+        assertEquals(2, statsA.x01SetsWon)
+        assertEquals(4, statsA.x01LegsWon, "all 4 legs counted across both sets")
+        assertEquals(1, statsA.x01MatchesWon)
+        assertEquals(0, statsB.x01SetsWon)
+        assertEquals(0, statsB.x01LegsWon)
+        assertEquals(0, statsB.x01MatchesWon)
+    }
+
+    @Test
+    fun setsWon_isZeroForLegacySingleLegGames() {
+        val turns = listOf(turn(40, 40, finished = true))
+        val stats = StatsAggregator.statsFor("A",
+            listOf(x01Record("A", turns, startScore = 40, won = true)))
+        assertEquals(0, stats.x01SetsWon, "no sets layer -> zero sets won")
     }
 
     @Test

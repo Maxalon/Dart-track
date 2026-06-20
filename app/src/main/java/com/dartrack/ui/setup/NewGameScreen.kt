@@ -54,6 +54,7 @@ fun NewGameScreen(
     var startScore by remember { mutableStateOf(501) }
     var doubleOut by remember { mutableStateOf(true) }
     var legsToWin by remember { mutableStateOf(1) }
+    var setsToWin by remember { mutableStateOf(1) }
     val playerNames = remember { mutableStateListOf("Player 1", "Player 2") }
 
     Column(
@@ -97,13 +98,27 @@ fun NewGameScreen(
                 Text("  Finish on a double (double-out)")
             }
             Spacer(Modifier.height(16.dp))
-            Text("Legs (first to)", fontWeight = FontWeight.SemiBold)
+            Text(
+                if (setsToWin > 1) "Legs per set (first to)" else "Legs (first to)",
+                fontWeight = FontWeight.SemiBold,
+            )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 X01State.SUPPORTED_LEGS.forEach { n ->
                     FilterChip(
                         selected = legsToWin == n,
                         onClick = { legsToWin = n },
                         label = { Text(if (n == 1) "Single leg" else "First to $n") },
+                    )
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+            Text("Sets (first to)", fontWeight = FontWeight.SemiBold)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                X01State.SUPPORTED_SETS.forEach { n ->
+                    FilterChip(
+                        selected = setsToWin == n,
+                        onClick = { setsToWin = n },
+                        label = { Text(if (n == 1) "No sets" else "First to $n") },
                     )
                 }
             }
@@ -144,7 +159,7 @@ fun NewGameScreen(
                         .map { it.trim().ifBlank { "Player" } }
                         .map { GamePlayer(it) }
                     val state = when (mode) {
-                        GameMode.X01 -> X01State.new(players, startScore, doubleOut, legsToWin)
+                        GameMode.X01 -> X01State.new(players, startScore, doubleOut, legsToWin, setsToWin)
                         GameMode.CRICKET -> CricketState.new(players)
                         GameMode.HALF_IT -> HalfItState.new(players)
                         GameMode.AROUND_CLOCK -> AroundTheClockState.new(players)
