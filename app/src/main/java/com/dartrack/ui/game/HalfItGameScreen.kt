@@ -8,8 +8,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.VolumeOff
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -18,6 +23,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -50,12 +56,33 @@ fun HalfItGameScreen(
     val target = state.currentTarget()
     val maxValue = maxValueForTarget(target)
 
+    val caller = rememberCaller()
+    var callerOn by rememberSaveable { mutableStateOf(false) }
+
+    // Announce a Half-It round: the points scored, or "Halved" when nothing
+    // was hit (which halves the running total per HalfItState.applyTurn).
+    fun announceHalfIt(points: Int) {
+        if (!callerOn) return
+        val text = when {
+            points == 0 -> "Halved"
+            points == 1 -> "scored 1 point"
+            else -> "scored $points points"
+        }
+        caller.speak(text, callerOn)
+    }
+
     Column(modifier = Modifier.fillMaxSize().padding(8.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text("Half-It", fontSize = 14.sp, modifier = Modifier.weight(1f))
+            IconButton(onClick = { callerOn = !callerOn }) {
+                Icon(
+                    if (callerOn) Icons.Default.VolumeUp else Icons.Default.VolumeOff,
+                    contentDescription = if (callerOn) "Mute caller" else "Enable caller",
+                )
+            }
             TextButton(onClick = onExit) { Text("Exit") }
         }
 
@@ -149,6 +176,7 @@ fun HalfItGameScreen(
                 entry = entry,
                 onEntryChange = { entry = it },
                 onConfirm = { v ->
+                    announceHalfIt(v)
                     vm.applyHalfItTurn(v)
                     entry = ""
                 },

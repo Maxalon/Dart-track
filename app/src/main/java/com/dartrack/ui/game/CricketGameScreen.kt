@@ -16,10 +16,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Undo
+import androidx.compose.material.icons.filled.VolumeOff
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -29,6 +32,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -61,12 +67,37 @@ fun CricketGameScreen(
     val pendingTotal = pending.values.sum()
     val canConfirm = !state.isFinished
 
+    val caller = rememberCaller()
+    var callerOn by rememberSaveable { mutableStateOf(false) }
+
+    // Announce a Cricket turn. The win outcome is computed by running the model's
+    // own pure applyTurn (which returns a new state and does not mutate anything)
+    // so the announcement always matches the real result.
+    fun announceCricket(marks: Map<Int, Int>) {
+        if (!callerOn) return
+        val total = marks.values.sum()
+        val whoActed = state.currentPlayerIndex
+        val won = state.applyTurn(marks).winnerIndices.contains(whoActed)
+        val text = when {
+            won -> "game shot!"
+            total == 1 -> "1 mark"
+            else -> "$total marks"
+        }
+        caller.speak(text, callerOn)
+    }
+
     Column(modifier = Modifier.fillMaxSize().padding(8.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text("Cricket", fontSize = 14.sp, modifier = Modifier.weight(1f))
+            IconButton(onClick = { callerOn = !callerOn }) {
+                Icon(
+                    if (callerOn) Icons.Default.VolumeUp else Icons.Default.VolumeOff,
+                    contentDescription = if (callerOn) "Mute caller" else "Enable caller",
+                )
+            }
             TextButton(onClick = onExit) { Text("Exit") }
         }
 
@@ -197,6 +228,7 @@ fun CricketGameScreen(
             ) { Text("Clear") }
             Button(
                 onClick = {
+                    announceCricket(pending.toMap())
                     vm.applyCricketTurn(pending.toMap())
                     pending.clear()
                 },
