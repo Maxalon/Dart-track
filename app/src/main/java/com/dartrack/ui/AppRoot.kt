@@ -1,5 +1,10 @@
 package com.dartrack.ui
 
+import androidx.compose.animation.AnimatedContentTransitionScope.SlideDirection
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -32,7 +37,30 @@ fun AppRoot() {
     val appVm: AppViewModel = viewModel(factory = AppViewModel.Factory(repo))
     val games by appVm.games.collectAsState()
 
-    NavHost(navController = nav, startDestination = "home") {
+    NavHost(
+        navController = nav,
+        startDestination = "home",
+        // Forward navigation: new screen slides in from the right while fading in.
+        enterTransition = {
+            slideIntoContainer(SlideDirection.Start, animationSpec = tween(NAV_ANIM_MS, easing = FastOutSlowInEasing)) +
+                fadeIn(tween(NAV_ANIM_MS, easing = FastOutSlowInEasing))
+        },
+        // Forward navigation: current screen slides out to the left while fading out.
+        exitTransition = {
+            slideOutOfContainer(SlideDirection.Start, animationSpec = tween(NAV_ANIM_MS, easing = FastOutSlowInEasing)) +
+                fadeOut(tween(NAV_ANIM_MS, easing = FastOutSlowInEasing))
+        },
+        // Back (pop): mirror — previous screen slides in from the left.
+        popEnterTransition = {
+            slideIntoContainer(SlideDirection.End, animationSpec = tween(NAV_ANIM_MS, easing = FastOutSlowInEasing)) +
+                fadeIn(tween(NAV_ANIM_MS, easing = FastOutSlowInEasing))
+        },
+        // Back (pop): current screen slides out to the right.
+        popExitTransition = {
+            slideOutOfContainer(SlideDirection.End, animationSpec = tween(NAV_ANIM_MS, easing = FastOutSlowInEasing)) +
+                fadeOut(tween(NAV_ANIM_MS, easing = FastOutSlowInEasing))
+        },
+    ) {
         composable("home") {
             HomeScreen(
                 onNewGame = { nav.navigate("new_game") },
@@ -40,7 +68,18 @@ fun AppRoot() {
                 onStats = { nav.navigate("stats") },
             )
         }
-        composable("new_game") {
+        composable(
+            "new_game",
+            // Modal-like setup screen: slides up from the bottom and back down on dismiss.
+            enterTransition = {
+                slideIntoContainer(SlideDirection.Up, animationSpec = tween(NAV_ANIM_MS, easing = FastOutSlowInEasing)) +
+                    fadeIn(tween(NAV_ANIM_MS, easing = FastOutSlowInEasing))
+            },
+            popExitTransition = {
+                slideOutOfContainer(SlideDirection.Down, animationSpec = tween(NAV_ANIM_MS, easing = FastOutSlowInEasing)) +
+                    fadeOut(tween(NAV_ANIM_MS, easing = FastOutSlowInEasing))
+            },
+        ) {
             NewGameScreen(
                 onCancel = { nav.popBackStack() },
                 onStart = { id ->
@@ -96,3 +135,6 @@ fun AppRoot() {
         }
     }
 }
+
+/** Short, snappy navigation transition duration so the app still feels instant. */
+private const val NAV_ANIM_MS = 250
