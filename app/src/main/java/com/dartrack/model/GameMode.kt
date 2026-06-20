@@ -3,7 +3,7 @@ package com.dartrack.model
 import kotlinx.serialization.Serializable
 
 @Serializable
-enum class GameMode { X01, CRICKET, HALF_IT, AROUND_CLOCK, BOBS_27, SHANGHAI }
+enum class GameMode { X01, CRICKET, HALF_IT, AROUND_CLOCK, BOBS_27, SHANGHAI, CATCH_40 }
 
 @Serializable
 data class GamePlayer(val name: String)

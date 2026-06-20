@@ -36,6 +36,7 @@ import com.dartrack.model.GameMode
 import com.dartrack.model.GamePlayer
 import com.dartrack.model.AroundTheClockState
 import com.dartrack.model.BobsTwentySevenState
+import com.dartrack.model.Catch40State
 import com.dartrack.model.CricketState
 import com.dartrack.model.HalfItState
 import com.dartrack.model.ShanghaiState
@@ -78,6 +79,7 @@ fun NewGameScreen(
                         GameMode.AROUND_CLOCK -> "Around the Clock"
                         GameMode.BOBS_27 -> "Bob's 27"
                         GameMode.SHANGHAI -> "Shanghai"
+                        GameMode.CATCH_40 -> "Catch 40"
                     }) },
                 )
             }
@@ -169,6 +171,7 @@ fun NewGameScreen(
                         GameMode.AROUND_CLOCK -> AroundTheClockState.new(players)
                         GameMode.BOBS_27 -> BobsTwentySevenState.new(players)
                         GameMode.SHANGHAI -> ShanghaiState.new(players)
+                        GameMode.CATCH_40 -> Catch40State.new(players)
                     }
                     val now = System.currentTimeMillis()
                     val record = GameRecord(
