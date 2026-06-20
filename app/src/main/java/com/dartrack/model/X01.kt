@@ -48,17 +48,36 @@ data class X01State(
     val doubleOut: Boolean = true,
     override val currentPlayerIndex: Int = 0,
     override val winnerIndices: List<Int> = emptyList(),
-    // ---- Match-play (legs) fields. All defaulted for backward compatibility:
-    // a game persisted before this feature deserializes as a single-leg match
-    // (legsToWin = 1, no leg history) with identical behavior to before.
-    /** First player to win this many legs wins the match. 1 = single leg. */
+    // ---- Match-play (legs + sets) fields. All defaulted for backward
+    // compatibility: a game persisted before this feature deserializes as a
+    // single-set, single-leg match (setsToWin = 1, legsToWin = 1, no history)
+    // with identical behavior to before.
+    /**
+     * First player to win this many legs wins the CURRENT SET. When
+     * [setsToWin] == 1 there is no sets layer, so this is equivalent to the
+     * legacy meaning "legs needed to win the match".
+     */
     val legsToWin: Int = 1,
-    /** Per-player legs won so far. Empty is treated as all-zeros. */
+    /**
+     * Per-player legs won in the CURRENT set so far. Resets to zeros when a set
+     * is won. Empty is treated as all-zeros.
+     */
     val legWins: List<Int> = emptyList(),
     /** Who throws first in the CURRENT leg; rotates each leg. */
     val startingPlayerIndex: Int = 0,
-    /** Finished legs in order, for full per-leg history. */
+    /**
+     * Finished legs in order, for full per-leg history. Accumulates ALL legs
+     * across the whole match (it is NOT reset when a set is won), so stats see
+     * every leg of every set.
+     */
     val completedLegs: List<X01CompletedLeg> = emptyList(),
+    /**
+     * First player to win this many sets wins the MATCH. 1 = no sets layer
+     * (current legs-only behavior).
+     */
+    val setsToWin: Int = 1,
+    /** Per-player sets won so far. Empty is treated as all-zeros. */
+    val setWins: List<Int> = emptyList(),
 ) : GameState {
 
     fun currentPlayerScore(): Int =
@@ -67,11 +86,14 @@ data class X01State(
     fun scoreFor(playerIndex: Int): Int =
         perPlayer[playerIndex].turns.lastOrNull()?.scoreAfter ?: startScore
 
-    /** Legs won by [playerIndex] so far (current leg not yet counted). */
+    /** Legs won by [playerIndex] in the CURRENT set (current leg not counted). */
     fun legsWonBy(playerIndex: Int): Int = legWins.getOrElse(playerIndex) { 0 }
 
-    /** True when this is a multi-leg match (UI shows the leg scoreboard). */
-    val isMatch: Boolean get() = legsToWin > 1
+    /** Sets won by [playerIndex] so far (current set not yet counted). */
+    fun setsWonBy(playerIndex: Int): Int = setWins.getOrElse(playerIndex) { 0 }
+
+    /** True when this is a multi-leg or multi-set match (UI shows scoreboard). */
+    val isMatch: Boolean get() = legsToWin > 1 || setsToWin > 1
 
     /**
      * Every [X01PlayerState] this player has had across ALL legs: each completed
@@ -140,44 +162,73 @@ data class X01State(
             )
         }
 
-        // The current player has just checked out and won the leg.
+        // The current player has just checked out and won the leg (in the set).
         val winnerIdx = currentPlayerIndex
-        val baseWins = if (legWins.size == players.size) legWins
-                       else List(players.size) { legWins.getOrElse(it) { 0 } }
-        val newWins = baseWins.toMutableList().also { it[winnerIdx] = it[winnerIdx] + 1 }
+        val baseLegWins = normalize(legWins)
+        val newLegWins = baseLegWins.toMutableList().also { it[winnerIdx] = it[winnerIdx] + 1 }
         val completedLeg = X01CompletedLeg(perPlayer = updatedPlayers, winnerIndex = winnerIdx)
         val newCompleted = completedLegs + completedLeg
+        val zeros = List(players.size) { 0 }
 
-        return if (newWins[winnerIdx] >= legsToWin) {
+        if (newLegWins[winnerIdx] < legsToWin) {
+            // NEXT LEG within the current set: reset every player's score, rotate
+            // who throws first, keep the match in progress and the set ongoing.
+            val nextStarter = (startingPlayerIndex + 1) % players.size
+            return copy(
+                perPlayer = players.map { X01PlayerState(it) },
+                currentPlayerIndex = nextStarter,
+                winnerIndices = winnerIndices,
+                legWins = newLegWins,
+                startingPlayerIndex = nextStarter,
+                completedLegs = newCompleted,
+            )
+        }
+
+        // SET WON: this leg win completed the set. Increment sets, reset legs.
+        val baseSetWins = normalize(setWins)
+        val newSetWins = baseSetWins.toMutableList().also { it[winnerIdx] = it[winnerIdx] + 1 }
+
+        return if (newSetWins[winnerIdx] >= setsToWin) {
             // MATCH OVER: record the match winner; keep current player on them.
+            // The deciding leg lives in BOTH completedLegs and the live perPlayer
+            // so undo + allLegStatesFor dedup keep working.
             copy(
                 perPlayer = updatedPlayers,
                 currentPlayerIndex = winnerIdx,
                 winnerIndices = winnerIndices + winnerIdx,
-                legWins = newWins,
+                legWins = newLegWins,
                 completedLegs = newCompleted,
+                setWins = newSetWins,
             )
         } else {
-            // START THE NEXT LEG: reset every player's score, rotate who throws
-            // first, and keep the match in progress (winnerIndices stays empty).
+            // NEXT SET: reset legs to zero, start a fresh leg, rotate starter.
             val nextStarter = (startingPlayerIndex + 1) % players.size
             copy(
                 perPlayer = players.map { X01PlayerState(it) },
                 currentPlayerIndex = nextStarter,
                 winnerIndices = winnerIndices,
-                legWins = newWins,
+                legWins = zeros,
                 startingPlayerIndex = nextStarter,
                 completedLegs = newCompleted,
+                setWins = newSetWins,
             )
         }
     }
 
-    /** Undo the most recently confirmed turn, crossing leg boundaries. */
+    /** Normalize a per-player counter list to player count, padding with zeros. */
+    private fun normalize(counts: List<Int>): List<Int> =
+        if (counts.size == players.size) counts
+        else List(players.size) { counts.getOrElse(it) { 0 } }
+
+    /** Undo the most recently confirmed turn, crossing leg and set boundaries. */
     fun undoLast(): X01State {
-        // Match-over case: the last action was the match-deciding checkout. The
-        // winning leg is both the live [perPlayer] (board still shows it) AND the
-        // last entry in [completedLegs]. Roll the match back into that leg as an
-        // in-progress leg by dropping the winning turn and popping the snapshot.
+        // Case A — Match-over: the last action was the match-deciding checkout.
+        // The winning leg is both the live [perPlayer] (board still shows it) AND
+        // the last entry in [completedLegs]. Roll the match back into that leg as
+        // an in-progress leg by dropping the winning turn and popping the snapshot.
+        // Standings (sets + current-set legs) are recomputed from the remaining
+        // completed legs, which correctly reverses a set-deciding checkout too:
+        // the set the player just won is reopened with its prior leg tally.
         if (winnerIndices.isNotEmpty() && completedLegs.isNotEmpty()) {
             val winnerIdx = completedLegs.last().winnerIndex
             val target = perPlayer[winnerIdx]
@@ -185,36 +236,45 @@ data class X01State(
                 val updated = perPlayer.toMutableList().also {
                     it[winnerIdx] = target.copy(turns = target.turns.dropLast(1))
                 }
+                val (sets, legs) = standingsFrom(completedLegs.dropLast(1))
                 return copy(
                     perPlayer = updated,
                     currentPlayerIndex = winnerIdx,
                     winnerIndices = winnerIndices.filter { it != winnerIdx },
-                    legWins = decrementLeg(winnerIdx),
+                    legWins = legs,
                     completedLegs = completedLegs.dropLast(1),
+                    setWins = sets,
                 )
             }
         }
 
-        // Leg-boundary case: the current leg has not been started (no turns by
-        // anyone) but at least one leg is complete. The last confirmed action
-        // was the winning checkout of the previous leg, so restore that leg in
-        // full and put the cursor back on the player who threw the winning dart.
+        // Case B — Leg/set boundary: the current leg has not been started (no
+        // turns by anyone) but at least one leg is complete. The last confirmed
+        // action was the winning checkout of the previous leg (which may also have
+        // closed a set). Restore that leg in full and put the cursor back on the
+        // player who threw the winning dart. Recomputing standings from the
+        // remaining completed legs reverses both a plain leg rollover (legWins
+        // decremented) and a set rollover (the just-closed set reopened with its
+        // pre-reset leg tally, that set's win removed).
         if (completedLegs.isNotEmpty() && perPlayer.all { it.turns.isEmpty() }) {
             val lastLeg = completedLegs.last()
             val winnerIdx = lastLeg.winnerIndex
             // The current (empty) leg's starter was rotated forward when the leg
-            // rolled over; step it back to the restored leg's starter.
+            // (or set) rolled over; step it back to the restored leg's starter.
             val restoredStarter = (startingPlayerIndex - 1 + players.size) % players.size
+            val (sets, legs) = standingsFrom(completedLegs.dropLast(1))
             return copy(
                 perPlayer = lastLeg.perPlayer,
                 currentPlayerIndex = winnerIdx,
                 winnerIndices = winnerIndices.filter { it != winnerIdx },
-                legWins = decrementLeg(winnerIdx),
+                legWins = legs,
                 startingPlayerIndex = restoredStarter,
                 completedLegs = completedLegs.dropLast(1),
+                setWins = sets,
             )
         }
 
+        // Case C — Normal turn within a leg.
         val targetIdx = if (winnerIndices.isNotEmpty()) winnerIndices.last()
                         else (currentPlayerIndex - 1 + players.size) % players.size
         val target = perPlayer[targetIdx]
@@ -229,12 +289,32 @@ data class X01State(
         )
     }
 
-    /** Return [legWins] (normalized to player count) with [idx] decremented. */
-    private fun decrementLeg(idx: Int): List<Int> =
-        (if (legWins.size == players.size) legWins
-         else List(players.size) { legWins.getOrElse(it) { 0 } })
-            .toMutableList()
-            .also { it[idx] = (it[idx] - 1).coerceAtLeast(0) }
+    /**
+     * Set/leg standings derived purely from a list of completed legs, by
+     * replaying the same accumulation rule [applyTurn] uses: each leg increments
+     * the current set's legWins for its winner; when a player reaches [legsToWin]
+     * legs the set closes (their setWins increments and legWins reset to zero).
+     *
+     * This is the inverse used by [undoLast] at set boundaries: when a set is won
+     * the live [legWins] are reset to zero, discarding the just-finished set's
+     * per-player leg tally, so to step back we must recompute from history.
+     *
+     * Returns (setWins, legWinsInCurrentSet). The final (in-progress) set's legs
+     * are whatever remains after the last completed set closed.
+     */
+    private fun standingsFrom(legs: List<X01CompletedLeg>): Pair<List<Int>, List<Int>> {
+        val sets = MutableList(players.size) { 0 }
+        var curLegs = MutableList(players.size) { 0 }
+        for (leg in legs) {
+            val w = leg.winnerIndex
+            curLegs[w] = curLegs[w] + 1
+            if (curLegs[w] >= legsToWin) {
+                sets[w] = sets[w] + 1
+                curLegs = MutableList(players.size) { 0 }
+            }
+        }
+        return sets to curLegs
+    }
 
     companion object {
         fun new(
@@ -242,6 +322,7 @@ data class X01State(
             startScore: Int = 501,
             doubleOut: Boolean = true,
             legsToWin: Int = 1,
+            setsToWin: Int = 1,
         ): X01State = X01State(
             players = players,
             perPlayer = players.map { X01PlayerState(it) },
@@ -251,10 +332,13 @@ data class X01State(
             legWins = List(players.size) { 0 },
             startingPlayerIndex = 0,
             completedLegs = emptyList(),
+            setsToWin = setsToWin.coerceAtLeast(1),
+            setWins = List(players.size) { 0 },
         )
 
         val SUPPORTED_STARTS = listOf(101, 201, 301, 401, 501, 701, 901)
         val SUPPORTED_LEGS = listOf(1, 3, 5, 7)
+        val SUPPORTED_SETS = listOf(1, 3, 5)
     }
 }
 

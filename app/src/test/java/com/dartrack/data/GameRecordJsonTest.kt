@@ -115,9 +115,58 @@ class GameRecordJsonTest {
         assertEquals(0, state.startingPlayerIndex)
         assertTrue(state.completedLegs.isEmpty())
         assertEquals(0, state.legsWonBy(0), "empty legWins treated as zeros")
+        // The sets layer also defaults to "off" for legacy data.
+        assertEquals(1, state.setsToWin, "defaults to single set")
+        assertTrue(state.setWins.isEmpty())
+        assertEquals(0, state.setsWonBy(0), "empty setWins treated as zeros")
         // Still fully playable from the legacy state.
         val after = state.applyTurn(60)
         assertEquals(441, after.scoreFor(0))
+    }
+
+    @Test
+    fun legsOnlyJson_withoutSetFields_decodesToSingleSet() {
+        // Simulates a game persisted with the legs feature but BEFORE sets:
+        // legsToWin / legWins / completedLegs present, but no setsToWin/setWins.
+        val legacy = """
+            {"id":"legs","mode":"X01","createdAtEpochMs":1,"updatedAtEpochMs":2,
+             "state":{"type":"x01",
+               "players":[{"name":"Alice"},{"name":"Bob"}],
+               "perPlayer":[{"player":{"name":"Alice"},"turns":[]},
+                            {"player":{"name":"Bob"},"turns":[]}],
+               "startScore":40,"doubleOut":false,
+               "currentPlayerIndex":1,"winnerIndices":[],
+               "legsToWin":3,"legWins":[1,0],"startingPlayerIndex":1,
+               "completedLegs":[{"perPlayer":[
+                  {"player":{"name":"Alice"},"turns":[
+                     {"scoreBefore":40,"entered":40,"bust":false,"finished":true}]},
+                  {"player":{"name":"Bob"},"turns":[]}],"winnerIndex":0}]}}
+        """.trimIndent()
+        val decoded = json.decodeFromString(GameRecord.serializer(), legacy)
+        val state = decoded.state as X01State
+        assertEquals(3, state.legsToWin)
+        assertEquals(1, state.legsWonBy(0), "current-set legs preserved")
+        assertEquals(1, state.setsToWin, "no sets layer for legacy legs-only data")
+        assertTrue(state.setWins.isEmpty())
+        assertEquals(0, state.setsWonBy(0))
+        assertEquals(1, state.completedLegs.size)
+    }
+
+    @Test
+    fun x01SetMatchRecord_roundTrips() {
+        var state = X01State.new(players, startScore = 40, doubleOut = false,
+            legsToWin = 2, setsToWin = 2)
+        state = state.applyTurn(40)                 // Alice wins set1 leg1
+        state = state.applyTurn(0)                  // Bob
+        state = state.applyTurn(40)                 // Alice wins set1 -> set rollover
+        val record = GameRecord("set-1", GameMode.X01, 1L, 2L, state)
+        val decoded = roundTrip(record)
+        assertEquals(record, decoded)
+        val s = decoded.state as X01State
+        assertEquals(2, s.setsToWin)
+        assertEquals(1, s.setsWonBy(0))
+        assertEquals(0, s.legsWonBy(0), "legs reset after set won")
+        assertEquals(2, s.completedLegs.size)
     }
 
     @Test
