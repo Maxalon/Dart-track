@@ -7,7 +7,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
@@ -63,7 +65,7 @@ fun PlayerStatsScreen(onBack: () -> Unit) {
         players.firstOrNull { it.id == selectedId } ?: players.firstOrNull()
     }
 
-    Column(modifier = Modifier.fillMaxSize().padding(8.dp)) {
+    Column(modifier = Modifier.fillMaxSize().statusBarsPadding().padding(8.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -120,7 +122,8 @@ fun PlayerStatsScreen(onBack: () -> Unit) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState()),
+                .verticalScroll(rememberScrollState())
+                .navigationBarsPadding(),
         ) {
             if (stats.gamesPlayed == 0) {
                 EmptyPeriodCard()
