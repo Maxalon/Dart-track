@@ -5,11 +5,13 @@ coreKtx = "1.13.1"
 lifecycle = "2.8.6"
 activityCompose = "1.9.3"
 composeBom = "2025.10.01"
-# Material 3 Expressive APIs (MaterialExpressiveTheme, MotionScheme, ButtonGroup)
-# are public only on the material3 alpha track; in the 1.4.0 STABLE release they
-# are `internal`. Pin material3 to a 1.5.0-alpha that pairs with the Compose 1.10
-# line shipped by the BOM above so the rest of Compose stays on the BOM versions.
-material3 = "1.5.0-alpha01"
+# Material 3 Expressive APIs (MaterialExpressiveTheme, MotionScheme.expressive,
+# ButtonGroup, Modifier.animateWidth) are public (experimental, opt-in) in the
+# 1.4.0 STABLE release. We pin material3 explicitly here so it overrides the
+# version the Compose BOM/transitive deps would otherwise resolve (which was
+# landing on an older 1.3.x where these symbols are `internal`/unresolved).
+# The rest of the Compose artifacts stay on the BOM.
+material3 = "1.4.0"
 navigationCompose = "2.8.3"
 serializationJson = "1.7.3"
 datastorePreferences = "1.1.1"
