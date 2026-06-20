@@ -9,11 +9,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Undo
@@ -93,8 +93,8 @@ fun CricketGameScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(8.dp),
+            .statusBarsPadding()
+            .padding(horizontal = 8.dp),
     ) {
         // ---- Top bar: mode summary, caller toggle, exit. ------------------
         Row(
@@ -118,6 +118,10 @@ fun CricketGameScreen(
             TextButton(onClick = onExit) { Text("Exit") }
         }
 
+        // ---- Players area: scoreboard absorbs spare vertical space so the
+        // screen never scrolls. The active thrower's row is the prominent one
+        // (bold name + larger animated score); no separate duplicate header.
+        Column(modifier = Modifier.weight(1f)) {
         // ---- Targets legend (shared across the player cards below). -------
         Card(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
@@ -213,27 +217,30 @@ fun CricketGameScreen(
                     Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
                         Text(
                             animatedScore.toString(),
-                            fontSize = if (active) 22.sp else 18.sp,
+                            fontSize = if (active) 24.sp else 18.sp,
                             fontWeight = FontWeight.Bold,
                         )
                     }
                 }
             }
         }
-
-        Spacer(Modifier.height(8.dp))
+        } // end players area
 
         if (state.isFinished) {
-            ElevatedCard(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
-                Column(modifier = Modifier.padding(20.dp)) {
+            ElevatedCard(
+                modifier = Modifier.fillMaxWidth().padding(8.dp).navigationBarsPadding(),
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
                     Text(
                         "Winner: ${state.winnerIndices.joinToString { state.players[it].name }}",
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
                     )
                     Spacer(Modifier.height(8.dp))
-                    TextButton(onClick = onExit) { Text("Back to home") }
-                    TextButton(onClick = { vm.undoCricket() }) { Text("Undo last turn") }
+                    Row {
+                        TextButton(onClick = onExit) { Text("Back to home") }
+                        TextButton(onClick = { vm.undoCricket() }) { Text("Undo last turn") }
+                    }
                 }
             }
             return
@@ -272,10 +279,10 @@ fun CricketGameScreen(
                 containerColor = MaterialTheme.colorScheme.surfaceVariant,
             ),
         ) {
-            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
                 CRICKET_TARGETS.forEach { t ->
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
@@ -307,14 +314,16 @@ fun CricketGameScreen(
             }
         }
 
-        Spacer(Modifier.height(8.dp))
+        // ---- Bottom controls: pinned clear of the Android nav bar. --------
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+            modifier = Modifier.fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 6.dp)
+                .navigationBarsPadding(),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             OutlinedButton(
                 onClick = { vm.undoCricket(); pending.clear() },
-                modifier = Modifier.weight(1f).height(56.dp),
+                modifier = Modifier.weight(1f).height(54.dp),
             ) {
                 Icon(Icons.Default.Undo, contentDescription = null)
                 Spacer(Modifier.size(4.dp))
@@ -322,7 +331,7 @@ fun CricketGameScreen(
             }
             OutlinedButton(
                 onClick = { pending.clear() },
-                modifier = Modifier.weight(1f).height(56.dp),
+                modifier = Modifier.weight(1f).height(54.dp),
             ) { Text("Clear") }
             Button(
                 onClick = {
@@ -331,7 +340,7 @@ fun CricketGameScreen(
                     pending.clear()
                 },
                 enabled = canConfirm,
-                modifier = Modifier.weight(2f).height(56.dp),
+                modifier = Modifier.weight(2f).height(54.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.primary,
                 ),
