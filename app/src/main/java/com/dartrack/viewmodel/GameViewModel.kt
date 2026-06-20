@@ -10,6 +10,7 @@ import com.dartrack.model.AroundTheClockState
 import com.dartrack.model.BobsTwentySevenState
 import com.dartrack.model.CricketState
 import com.dartrack.model.HalfItState
+import com.dartrack.model.ShanghaiState
 import com.dartrack.model.X01State
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -72,6 +73,11 @@ class GameViewModel(
         mutate { (it as BobsTwentySevenState).applyTurn(hits) }
 
     fun undoBobs27() = mutate { (it as BobsTwentySevenState).undoLast() }
+
+    fun applyShanghaiTurn(singles: Int, doubles: Int, triples: Int) =
+        mutate { (it as ShanghaiState).applyTurn(singles, doubles, triples) }
+
+    fun undoShanghai() = mutate { (it as ShanghaiState).undoLast() }
 
     class Factory(
         private val repo: GameRepository,

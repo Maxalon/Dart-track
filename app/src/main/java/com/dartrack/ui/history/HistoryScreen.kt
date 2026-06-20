@@ -133,6 +133,7 @@ fun HistoryScreen(
                                         GameMode.HALF_IT -> "Half-It"
                                         GameMode.AROUND_CLOCK -> "Around the Clock"
                                         GameMode.BOBS_27 -> "Bob's 27"
+                                        GameMode.SHANGHAI -> "Shanghai"
                                     },
                                     fontWeight = FontWeight.SemiBold,
                                     modifier = Modifier.weight(1f),

@@ -19,6 +19,7 @@ import com.dartrack.ui.game.AroundTheClockScreen
 import com.dartrack.ui.game.BobsTwentySevenScreen
 import com.dartrack.ui.game.CricketGameScreen
 import com.dartrack.ui.game.HalfItGameScreen
+import com.dartrack.ui.game.ShanghaiScreen
 import com.dartrack.ui.game.X01GameScreen
 import com.dartrack.ui.history.GameDetailScreen
 import com.dartrack.ui.history.HistoryScreen
@@ -116,6 +117,10 @@ fun AppRoot() {
                     onExit = { nav.popBackStack("home", inclusive = false) },
                 )
                 com.dartrack.model.GameMode.BOBS_27 -> BobsTwentySevenScreen(
+                    recordId = id,
+                    onExit = { nav.popBackStack("home", inclusive = false) },
+                )
+                com.dartrack.model.GameMode.SHANGHAI -> ShanghaiScreen(
                     recordId = id,
                     onExit = { nav.popBackStack("home", inclusive = false) },
                 )

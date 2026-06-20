@@ -37,6 +37,8 @@ import com.dartrack.model.BobsTwentySevenState
 import com.dartrack.model.CRICKET_TARGETS
 import com.dartrack.model.CricketState
 import com.dartrack.model.HalfItState
+import com.dartrack.model.SHANGHAI_ROUNDS
+import com.dartrack.model.ShanghaiState
 import com.dartrack.model.X01State
 import com.dartrack.model.X01Stats
 import kotlinx.coroutines.launch
@@ -79,6 +81,7 @@ fun GameDetailScreen(
                     GameMode.HALF_IT -> "Half-It"
                     GameMode.AROUND_CLOCK -> "Around the Clock"
                     GameMode.BOBS_27 -> "Bob's 27"
+                    GameMode.SHANGHAI -> "Shanghai"
                 }, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                 Text("Started: ${df.format(Date(rec.createdAtEpochMs))}")
                 Text("Updated: ${df.format(Date(rec.updatedAtEpochMs))}")
@@ -94,6 +97,7 @@ fun GameDetailScreen(
             is HalfItState -> HalfItDetail(s)
             is AroundTheClockState -> AroundTheClockDetail(s)
             is BobsTwentySevenState -> BobsTwentySevenDetail(s)
+            is ShanghaiState -> ShanghaiDetail(s)
         }
 
         Spacer(Modifier.height(12.dp))
@@ -234,6 +238,32 @@ private fun BobsTwentySevenDetail(s: BobsTwentySevenState) {
                     Text(
                         "doubles 1–$BOBS27_LAST_DOUBLE hits: " +
                             ps.turns.joinToString(" · ") { it.hits.toString() },
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Spacer(Modifier.height(6.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun ShanghaiDetail(s: ShanghaiState) {
+    Card(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            s.players.forEachIndexed { idx, p ->
+                val ps = s.perPlayer[idx]
+                Text(
+                    "${p.name}: ${ps.total} · ${ps.darts} darts",
+                    fontWeight = FontWeight.SemiBold,
+                )
+                if (ps.turns.isNotEmpty()) {
+                    Text(
+                        "rounds 1–$SHANGHAI_ROUNDS (s/d/t): " +
+                            ps.turns.joinToString(" · ") {
+                                "${it.singles}/${it.doubles}/${it.triples}"
+                            },
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
