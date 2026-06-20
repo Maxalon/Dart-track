@@ -22,6 +22,7 @@ fun HomeScreen(
     onNewGame: () -> Unit,
     onHistory: () -> Unit,
     onStats: () -> Unit,
+    onPlayerStats: () -> Unit,
 ) {
     Column(
         modifier = Modifier.fillMaxSize().padding(24.dp),
@@ -40,6 +41,10 @@ fun HomeScreen(
         Spacer(Modifier.height(12.dp))
         OutlinedButton(onClick = onStats, modifier = Modifier.fillMaxWidth()) {
             Text("Statistics")
+        }
+        Spacer(Modifier.height(12.dp))
+        OutlinedButton(onClick = onPlayerStats, modifier = Modifier.fillMaxWidth()) {
+            Text("Player stats")
         }
     }
 }
