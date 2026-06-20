@@ -413,7 +413,7 @@ class X01StateTest {
     fun twoSetMatch_setRollover_resetsLegsAndIncrementsSets() {
         // first-to-2 legs per set, first-to-2 sets. Single-out, start 40 so
         // every checkout is a single 40.
-        var s = setMatch(start = 40, legsToWin = 2, setsToWin = 2, "A", "B")
+        var s = setMatch(start = 40, doubleOut = false, legsToWin = 2, setsToWin = 2, "A", "B")
         // Set 1: A wins both legs.
         s = s.applyTurn(40)              // leg1: A (A started)
         assertEquals(1, s.legsWonBy(0))
@@ -455,7 +455,7 @@ class X01StateTest {
     fun twoSetMatch_splitSets_thirdSetDecides() {
         // first-to-2 legs/set, first-to-2 sets. A takes set 1, B takes set 2,
         // A takes set 3 -> A wins 2-1 in sets.
-        var s = setMatch(start = 40, legsToWin = 2, setsToWin = 2, "A", "B")
+        var s = setMatch(start = 40, doubleOut = false, legsToWin = 2, setsToWin = 2, "A", "B")
         // Set 1 -> A (A wins L1 & L2)
         s = aWinsLeg(s); s = aWinsLeg(s)
         assertEquals(1, s.setsWonBy(0)); assertEquals(0, s.setsWonBy(1))
@@ -475,7 +475,7 @@ class X01StateTest {
     fun setMatch_undoAcrossSetBoundary_restoresPriorSet() {
         // After A wins set 1 (2 legs), undo should reopen the set-deciding leg
         // with the set un-won and legs back at the pre-checkout tally.
-        var s = setMatch(start = 40, legsToWin = 2, setsToWin = 2, "A", "B")
+        var s = setMatch(start = 40, doubleOut = false, legsToWin = 2, setsToWin = 2, "A", "B")
         s = s.applyTurn(40)                       // S1 L1: A (legWins A=1)
         assertEquals(1, s.currentPlayerIndex)
         s = s.applyTurn(0)                        // B throws L2
@@ -505,7 +505,7 @@ class X01StateTest {
     @Test
     fun setMatch_undoAcrossLegBoundaryWithinSet() {
         // Undo crossing a plain leg boundary inside a set must NOT touch setWins.
-        var s = setMatch(start = 40, legsToWin = 2, setsToWin = 2, "A", "B")
+        var s = setMatch(start = 40, doubleOut = false, legsToWin = 2, setsToWin = 2, "A", "B")
         s = s.applyTurn(40)                       // S1 L1: A wins, leg2 started
         assertEquals(1, s.legsWonBy(0))
         assertEquals(0, s.setsWonBy(0))
@@ -525,7 +525,7 @@ class X01StateTest {
 
     @Test
     fun setMatch_undoMatchDecidingCheckout_reopensFinalSetAndLeg() {
-        var s = setMatch(start = 40, legsToWin = 2, setsToWin = 2, "A", "B")
+        var s = setMatch(start = 40, doubleOut = false, legsToWin = 2, setsToWin = 2, "A", "B")
         // Set 1 -> A
         s = aWinsLeg(s); s = aWinsLeg(s)
         assertEquals(1, s.setsWonBy(0))
@@ -551,7 +551,7 @@ class X01StateTest {
     fun setMatch_statsAggregateAcrossAllLegsOfAllSets() {
         // Two sets, each two legs A wins with 120. completedLegs accumulate across
         // sets, so allLegStatesFor sees every leg of every set.
-        var s = setMatch(start = 120, legsToWin = 2, setsToWin = 2, "A", "B")
+        var s = setMatch(start = 120, doubleOut = false, legsToWin = 2, setsToWin = 2, "A", "B")
         fun aLeg120(st: X01State): X01State {
             var x = st
             if (x.currentPlayerIndex != 0) x = x.applyTurn(0)
