@@ -49,9 +49,23 @@ per-player statistics. Fully offline, no ads, no accounts.
   leg, legs/matches won, best turn, best checkout, wins, and high scores
   (Half-It). A per-player **3-dart-average trend chart** shows progress over
   time.
-- **Export** — the history screen can export all games as a JSON file via the
-  Android share sheet (same on-disk format as `games.json`), for backup or
-  moving to another device.
+- **Export / import** — the history screen can export all games as a JSON
+  file via the Android share sheet (same on-disk format as `games.json`), and
+  import that file back (merge by id, idempotent) for backup or moving to
+  another device.
+
+## Design & UX
+
+- Modern **Material 3** design system: a complete dartboard-red light/dark
+  color scheme (with **Material You** dynamic color on Android 12+), custom
+  typography, and shape tokens.
+- **Glanceable scoreboard** (X01): a hero remaining-score card with a
+  count-up animation, a bold current-player indicator, and a prominent
+  checkout-suggestion chip — built for reading at arm's length off a stand.
+- **Large, tactile score entry**: big keypad targets with haptic feedback on
+  taps, confirm, bust, and game shot.
+- **Animated navigation**: slide + fade transitions between screens (New Game
+  enters as a slide-up modal).
 
 ## Tests
 
