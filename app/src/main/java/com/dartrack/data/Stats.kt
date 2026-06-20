@@ -15,6 +15,22 @@ data class PlayerStats(
     val x01HighestTurn: Int,
     val x01HighestCheckout: Int,
     val x01GamesPlayed: Int,
+    // X01 deep metrics
+    val x01OneEighties: Int,
+    /** Turns scoring 100+ (inclusive). Includes the 140+ and 180 turns too. */
+    val x01TonPlus: Int,
+    /** Turns scoring 140..180 (inclusive). Includes the 180 turns too. */
+    val x01OneFortyPlus: Int,
+    /** Average 3-dart score over the first 9 darts (first 3 turns) of each leg. */
+    val x01FirstNineAvg: Double,
+    /** Successful checkouts / checkout opportunities, as a fraction 0.0..1.0. */
+    val x01CheckoutPct: Double,
+    val x01CheckoutHits: Int,
+    val x01CheckoutAttempts: Int,
+    /** Fewest darts to finish a leg, among legs this player won. 0 if none. */
+    val x01BestLegDarts: Int,
+    /** Average darts thrown per X01 leg played. 0.0 if none. */
+    val x01AvgDartsPerLeg: Double,
     // Cricket
     val cricketGamesPlayed: Int,
     val cricketGamesWon: Int,
@@ -25,6 +41,29 @@ data class PlayerStats(
 
 object StatsAggregator {
 
+    /*
+     * Definitions for the X01 deep metrics (read carefully — these are
+     * approximations forced by the fact that we only persist a single 0..180
+     * 3-dart total per turn, never individual darts):
+     *
+     *  - First-9 average: over each leg's first three confirmed turns (= first
+     *    9 darts), sum the points actually scored (busts contribute 0 points but
+     *    still 9 darts) and divide by darts thrown, x3. Across legs this is a
+     *    dart-weighted mean, so a player with fewer than 3 turns in a leg simply
+     *    contributes fewer darts. Formula: firstNinePoints * 3 / firstNineDarts.
+     *
+     *  - Checkout %: hits / opportunities.
+     *      opportunity = any turn the player threw from a finishable position,
+     *        approximated as scoreBefore <= 170 (the highest checkout under
+     *        double-out). We CANNOT see whether the player actually had a dart
+     *        at a double, so this over-counts opportunities (e.g. a turn from
+     *        120 that ends on 40 was likely a setup turn, not a real attempt).
+     *        It is therefore a conservative (pessimistic) checkout %.
+     *      hit = a turn flagged finished (the leg-winning checkout).
+     *    Each leg can contribute at most one hit but several opportunities, so
+     *    this number trends low. It is intended as a relative/trend figure, not
+     *    a precise PDC-style checkout percentage.
+     */
     fun aggregate(records: List<GameRecord>): List<PlayerStats> {
         // Collect every distinct player name across all records
         val names = records.flatMap { it.playerNames }.toSortedSet()
@@ -38,6 +77,21 @@ object StatsAggregator {
         var cricketPlayed = 0; var cricketWon = 0
         var halfItPlayed = 0; var halfItHigh = 0
 
+        // X01 deep-metric accumulators.
+        var oneEighties = 0
+        var tonPlus = 0
+        var oneFortyPlus = 0
+        // First-9 average is computed per leg as (first-9 points * 3 / first-9 darts),
+        // then averaged across legs that actually had at least one of their first
+        // three turns. We accumulate the raw points/darts across legs so the overall
+        // figure is a true dart-weighted average (matches how avg is normally read).
+        var firstNinePoints = 0L
+        var firstNineDarts = 0L
+        var checkoutHits = 0
+        var checkoutAttempts = 0
+        var bestLegDarts = 0
+        var x01Legs = 0
+
         for (r in records) {
             val idx = r.state.players.indexOfFirst { it.name == name }
             if (idx < 0) continue
@@ -47,12 +101,47 @@ object StatsAggregator {
             when (val s = r.state) {
                 is X01State -> {
                     x01Played++
+                    x01Legs++
                     val ps = s.perPlayer[idx]
+                    val turns = ps.turns
                     x01TotalPoints += X01Stats.pointsScored(ps, s.startScore).toLong()
-                    x01TotalDarts += (ps.turns.size * 3).toLong()
+                    x01TotalDarts += (turns.size * 3).toLong()
                     x01HighTurn = maxOf(x01HighTurn, X01Stats.highestTurn(ps))
                     X01Stats.checkout(ps)?.let {
                         x01HighCheckout = maxOf(x01HighCheckout, it)
+                    }
+
+                    // Scoring buckets: a busted turn scores 0, so only count
+                    // applied (non-bust) entered values.
+                    for (t in turns) {
+                        if (t.bust) continue
+                        if (t.entered == 180) oneEighties++
+                        if (t.entered >= 140) oneFortyPlus++
+                        if (t.entered >= 100) tonPlus++
+                    }
+
+                    // First-9: first three turns of this leg. Busts count as 9
+                    // darts scoring 0 points, consistent with threeDartAverage.
+                    for (t in turns.take(3)) {
+                        firstNinePoints += t.applied.toLong()
+                        firstNineDarts += 3L
+                    }
+
+                    // Checkout opportunities & hits (see object-level comment).
+                    for (t in turns) {
+                        if (t.scoreBefore <= 170) checkoutAttempts++
+                        if (t.finished) checkoutHits++
+                    }
+
+                    // Best leg / darts per leg: only legs this player won have a
+                    // meaningful "darts to finish" figure (an unfinished or lost
+                    // leg has no checkout dart).
+                    if (r.state.winnerIndices.contains(idx) &&
+                        turns.lastOrNull()?.finished == true) {
+                        val dartsToFinish = turns.size * 3
+                        if (bestLegDarts == 0 || dartsToFinish < bestLegDarts) {
+                            bestLegDarts = dartsToFinish
+                        }
                     }
                 }
                 is CricketState -> {
@@ -68,6 +157,12 @@ object StatsAggregator {
 
         val avg = if (x01TotalDarts == 0L) 0.0
                   else x01TotalPoints.toDouble() * 3.0 / x01TotalDarts
+        val firstNineAvg = if (firstNineDarts == 0L) 0.0
+                           else firstNinePoints.toDouble() * 3.0 / firstNineDarts
+        val checkoutPct = if (checkoutAttempts == 0) 0.0
+                          else checkoutHits.toDouble() / checkoutAttempts
+        val avgDartsPerLeg = if (x01Legs == 0) 0.0
+                             else x01TotalDarts.toDouble() / x01Legs
         return PlayerStats(
             name = name,
             gamesPlayed = gamesPlayed,
@@ -76,6 +171,15 @@ object StatsAggregator {
             x01HighestTurn = x01HighTurn,
             x01HighestCheckout = x01HighCheckout,
             x01GamesPlayed = x01Played,
+            x01OneEighties = oneEighties,
+            x01TonPlus = tonPlus,
+            x01OneFortyPlus = oneFortyPlus,
+            x01FirstNineAvg = firstNineAvg,
+            x01CheckoutPct = checkoutPct,
+            x01CheckoutHits = checkoutHits,
+            x01CheckoutAttempts = checkoutAttempts,
+            x01BestLegDarts = bestLegDarts,
+            x01AvgDartsPerLeg = avgDartsPerLeg,
             cricketGamesPlayed = cricketPlayed,
             cricketGamesWon = cricketWon,
             halfItGamesPlayed = halfItPlayed,
