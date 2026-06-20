@@ -122,28 +122,38 @@ class CricketStateTest {
 
     @Test
     fun win_blockedWhenAllClosedButTrailing() {
-        // A closes all targets but B has more points on a shared open target,
-        // so A does NOT win until A leads or ties.
-        var s = game("A", "B")
-        // B first piles points on 15 (close + extra) while A leaves 15 open.
-        s = s.applyTurn(mapOf(20 to 3)) // A close 20
-        s = s.applyTurn(mapOf(15 to 3)) // B close 15
-        s = s.applyTurn(mapOf(19 to 3)) // A close 19
-        s = s.applyTurn(mapOf(15 to 3)) // B 6 marks on 15 -> 3*15=45 pts (A open on 15)
-        assertEquals(45, s.scoreFor(1))
-        s = s.applyTurn(mapOf(18 to 3)) // A close 18
-        s = s.applyTurn(emptyMap())     // B pass
-        s = s.applyTurn(mapOf(17 to 3)) // A close 17
-        s = s.applyTurn(emptyMap())     // B pass
-        s = s.applyTurn(mapOf(16 to 3)) // A close 16
-        s = s.applyTurn(emptyMap())     // B pass
-        s = s.applyTurn(mapOf(25 to 3)) // A close 25 -- now A closed all but 15
-        s = s.applyTurn(emptyMap())     // B pass
-        // A still has 15 open; close it but A has 0 pts vs B's 45 -> NOT a win
-        s = s.applyTurn(mapOf(15 to 3)) // A closes 15, all closed, score 0 < 45
-        assertFalse(s.isFinished, "all closed but trailing on points -> no win yet")
-        assertEquals(0, s.scoreFor(0))
-        assertEquals(45, s.scoreFor(1))
+        // "Closed all but trailing -> no win" needs THREE players: because
+        // scoreFor() recomputes live and a target stops scoring once every
+        // opponent has closed it, a 2-player game can never reach this state
+        // (closing the last target zeroes the opponent's points on it). Here a
+        // third player (C) keeps target 20 open, so B's 60 points persist even
+        // after A closes 20. A closes all 7 targets but trails B -> A must NOT
+        // win yet. State is built directly to set up the exact pre-win position.
+        val a = CricketPlayerState(
+            GamePlayer("A"),
+            turns = listOf(20, 19, 18, 17, 16, 25).map { CricketTurn(mapOf(it to 3)) },
+        ) // A has closed 6 targets; 15 is still open
+        val b = CricketPlayerState(
+            GamePlayer("B"),
+            turns = listOf(CricketTurn(mapOf(20 to 3)), CricketTurn(mapOf(20 to 3))),
+        ) // B: 6 marks on 20 -> (6-3)*20 = 60 points while an opponent keeps 20 open
+        val c = CricketPlayerState(GamePlayer("C")) // C keeps every target open
+        val s = CricketState(
+            players = listOf(a.player, b.player, c.player),
+            perPlayer = listOf(a, b, c),
+            currentPlayerIndex = 0, // A to throw
+        )
+        // B is scoring 60 because C still has 20 open (A having closed 20 alone
+        // is not enough to stop B's points).
+        assertEquals(60, s.scoreFor(1))
+
+        // A closes the last target (15). Now A has closed all 7 but scores 0,
+        // trailing B's 60 -> the win must be blocked.
+        val after = s.applyTurn(mapOf(15 to 3))
+        assertTrue(after.perPlayer[0].hasClosedAll(), "A has closed all targets")
+        assertFalse(after.isFinished, "all closed but trailing on points -> no win yet")
+        assertEquals(0, after.scoreFor(0))
+        assertEquals(60, after.scoreFor(1))
     }
 
     @Test
