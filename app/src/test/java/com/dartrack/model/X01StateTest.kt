@@ -96,7 +96,7 @@ class X01StateTest {
 
     @Test
     fun turnRotation_advancesToNextPlayer() {
-        var s = game(start = 501, "A", "B", "C")
+        var s = game(start = 501, doubleOut = true, "A", "B", "C")
         assertEquals(0, s.currentPlayerIndex)
         s = s.applyTurn(60)
         assertEquals(1, s.currentPlayerIndex)
@@ -131,7 +131,7 @@ class X01StateTest {
 
     @Test
     fun undoLast_revertsLastTurn() {
-        var s = game(start = 501, "A", "B")
+        var s = game(start = 501, doubleOut = true, "A", "B")
         s = s.applyTurn(60) // A
         s = s.applyTurn(45) // B
         // last actor was B (index 1)
@@ -161,7 +161,7 @@ class X01StateTest {
 
     @Test
     fun undoLast_noTurns_isNoOp() {
-        val s = game(start = 501, "A", "B")
+        val s = game(start = 501, doubleOut = true, "A", "B")
         assertEquals(s, s.undoLast())
     }
 
@@ -179,7 +179,7 @@ class X01StateTest {
 
     @Test
     fun stats_pointsScored_noTurns_isZero() {
-        val s = game(start = 501, "A", "B")
+        val s = game(start = 501, doubleOut = true, "A", "B")
         assertEquals(0, X01Stats.pointsScored(s.perPlayer[0], 501))
     }
 
@@ -195,7 +195,7 @@ class X01StateTest {
 
     @Test
     fun stats_threeDartAverage_noTurns_isZero() {
-        val s = game(start = 501, "A", "B")
+        val s = game(start = 501, doubleOut = true, "A", "B")
         assertEquals(0.0, X01Stats.threeDartAverage(s.perPlayer[0], 501), 0.0)
     }
 
@@ -213,7 +213,7 @@ class X01StateTest {
 
     @Test
     fun stats_highestTurn_noTurns_isZero() {
-        val s = game(start = 501, "A", "B")
+        val s = game(start = 501, doubleOut = true, "A", "B")
         assertEquals(0, X01Stats.highestTurn(s.perPlayer[0]))
     }
 
@@ -225,7 +225,7 @@ class X01StateTest {
 
     @Test
     fun stats_checkout_nullWhenNotFinished() {
-        val s = game(start = 501, "A", "B").applyTurn(60)
+        val s = game(start = 501, doubleOut = true, "A", "B").applyTurn(60)
         assertEquals(null, X01Stats.checkout(s.perPlayer[0]))
     }
 
@@ -257,7 +257,7 @@ class X01StateTest {
 
     @Test
     fun match_firstLegWin_doesNotEndMatch_andStartsNextLeg() {
-        var s = match(start = 40, legsToWin = 3, "A", "B")
+        var s = match(start = 40, doubleOut = false, legsToWin = 3, "A", "B")
         s = s.applyTurn(40) // A wins leg 1
         assertFalse(s.isFinished, "match not over after one leg of three")
         assertEquals(1, s.legsWonBy(0))
@@ -274,7 +274,7 @@ class X01StateTest {
     @Test
     fun match_winsWhenReachingLegsToWin() {
         // first to 2; A wins leg1, then leg2 (A starts leg1, B starts leg2).
-        var s = match(start = 40, legsToWin = 2, "A", "B")
+        var s = match(start = 40, doubleOut = false, legsToWin = 2, "A", "B")
         s = s.applyTurn(40)          // A wins leg 1, B to throw leg 2
         assertEquals(1, s.currentPlayerIndex)
         s = s.applyTurn(0)           // B throws, no score
@@ -289,7 +289,7 @@ class X01StateTest {
 
     @Test
     fun match_undoAcrossLegBoundary_restoresPreviousLeg() {
-        var s = match(start = 40, legsToWin = 3, "A", "B")
+        var s = match(start = 40, doubleOut = false, legsToWin = 3, "A", "B")
         s = s.applyTurn(40) // A wins leg 1 -> leg 2 started, B to throw
         assertEquals(1, s.completedLegs.size)
         assertEquals(1, s.currentPlayerIndex)
@@ -309,7 +309,7 @@ class X01StateTest {
 
     @Test
     fun match_undoAfterMatchWin_clearsMatchAndReopensFinalLeg() {
-        var s = match(start = 40, legsToWin = 2, "A", "B")
+        var s = match(start = 40, doubleOut = false, legsToWin = 2, "A", "B")
         s = s.applyTurn(40)  // A wins leg 1
         s = s.applyTurn(0)   // B throws leg 2
         s = s.applyTurn(40)  // A wins leg 2 -> match over
@@ -329,7 +329,7 @@ class X01StateTest {
 
     @Test
     fun match_normalUndoWithinLeg_stillWorks() {
-        var s = match(start = 501, legsToWin = 3, "A", "B")
+        var s = match(start = 501, doubleOut = false, legsToWin = 3, "A", "B")
         s = s.applyTurn(60) // A
         s = s.applyTurn(45) // B
         val undone = s.undoLast()
@@ -343,7 +343,7 @@ class X01StateTest {
     fun match_stats_aggregateAcrossLegs() {
         // Small start so realistic 0..180 turns can finish a leg.
         // A finishes each won leg with 120 (highest turn / checkout = 120).
-        var s = match(start = 120, legsToWin = 2, "A", "B")
+        var s = match(start = 120, doubleOut = false, legsToWin = 2, "A", "B")
         // leg 1: A 120 (single-out finish). A starts leg 1.
         s = s.applyTurn(120)
         assertEquals(1, s.legsWonBy(0))
