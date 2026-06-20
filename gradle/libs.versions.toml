@@ -4,7 +4,16 @@ kotlin = "2.0.21"
 coreKtx = "1.13.1"
 lifecycle = "2.8.6"
 activityCompose = "1.9.3"
-composeBom = "2024.10.01"
+composeBom = "2025.10.01"
+# Material 3 Expressive APIs (MaterialExpressiveTheme, MotionScheme.expressive,
+# ButtonGroup, Modifier.animateWidth) are PUBLIC only on the material3 alpha
+# track. In the 1.4.0 STABLE release these symbols are `internal` (CI on commit
+# b0cfd79 with BOM-resolved material3 1.4.0 failed with "Cannot access ...: it
+# is internal in file"). Pin material3 to 1.5.0-alpha01, which exposes them
+# publicly behind @ExperimentalMaterial3ExpressiveApi and pairs with the
+# Compose 1.10 line shipped by the BOM above. CI on commit 0811903 with this
+# pin compiled and passed unit tests. The rest of Compose stays on the BOM.
+material3 = "1.5.0-alpha01"
 navigationCompose = "2.8.3"
 serializationJson = "1.7.3"
 datastorePreferences = "1.1.1"
@@ -20,7 +29,7 @@ androidx-ui = { group = "androidx.compose.ui", name = "ui" }
 androidx-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics" }
 androidx-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
 androidx-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
-androidx-material3 = { group = "androidx.compose.material3", name = "material3" }
+androidx-material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "material3" }
 androidx-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
 androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
 androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastorePreferences" }

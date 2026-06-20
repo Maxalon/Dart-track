@@ -2,7 +2,9 @@ package com.dartrack.ui.theme
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.MaterialExpressiveTheme
+import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
@@ -124,6 +126,16 @@ private val Dark = darkColorScheme(
     scrim = Black,
 )
 
+/**
+ * Material 3 Expressive theme for Dart-track.
+ *
+ * Uses [MaterialExpressiveTheme] so Material components pick up the expressive
+ * motion scheme (spirited, physics-based animations) on top of the existing
+ * brand color scheme, dynamic color, typography and shapes. The motion scheme
+ * is purely visual easing for component transitions — it adds no haptics and no
+ * win celebrations, in line with the product rules.
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun DartTrackTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
@@ -138,8 +150,9 @@ fun DartTrackTheme(
         darkTheme -> Dark
         else -> Light
     }
-    MaterialTheme(
+    MaterialExpressiveTheme(
         colorScheme = scheme,
+        motionScheme = MotionScheme.expressive(),
         typography = AppTypography,
         shapes = AppShapes,
         content = content,
