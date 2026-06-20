@@ -124,23 +124,42 @@ fun GameDetailScreen(
 private fun X01Detail(s: X01State) {
     Card(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
         Column(modifier = Modifier.padding(12.dp)) {
-            Text("Start ${s.startScore}${if (s.doubleOut) " · double-out" else ""}",
-                fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(4.dp))
-            s.players.forEachIndexed { idx, p ->
-                val ps = s.perPlayer[idx]
+            Text(
+                "Start ${s.startScore}${if (s.doubleOut) " · double-out" else ""}" +
+                    if (s.isMatch) " · first to ${s.legsToWin} legs" else "",
+                fontWeight = FontWeight.SemiBold,
+            )
+            if (s.isMatch) {
                 Text(
-                    "${p.name}: avg ${"%.1f".format(X01Stats.threeDartAverage(ps, s.startScore))}" +
-                        " · best ${X01Stats.highestTurn(ps)}" +
-                        (X01Stats.checkout(ps)?.let { " · checkout $it" } ?: "") +
-                        " · darts ${ps.turns.size * 3}",
+                    "Legs: " + s.players.indices.joinToString("  –  ") {
+                        s.legsWonBy(it).toString()
+                    } + "  (${s.completedLegs.size} completed)",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                val turnSummary = ps.turns.joinToString(" · ") {
-                    if (it.bust) "BUST" else it.entered.toString()
-                }
-                if (turnSummary.isNotEmpty()) {
-                    Text(turnSummary, fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Spacer(Modifier.height(4.dp))
+            // Aggregate stats across every leg (completed + current).
+            s.players.forEachIndexed { idx, p ->
+                val legs = s.allLegStatesFor(idx)
+                Text(
+                    "${p.name}: avg ${"%.1f".format(X01Stats.threeDartAverage(legs, s.startScore))}" +
+                        " · best ${X01Stats.highestTurn(legs)}" +
+                        (X01Stats.highestCheckout(legs)?.let { " · checkout $it" } ?: "") +
+                        " · darts ${legs.sumOf { it.turns.size } * 3}",
+                )
+                // Per-leg turn summary so the full history is visible.
+                legs.forEachIndexed { legIndex, ps ->
+                    val turnSummary = ps.turns.joinToString(" · ") {
+                        if (it.bust) "BUST" else it.entered.toString()
+                    }
+                    if (turnSummary.isNotEmpty()) {
+                        Text(
+                            (if (s.isMatch) "leg ${legIndex + 1}: " else "") + turnSummary,
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
                 Spacer(Modifier.height(6.dp))
             }

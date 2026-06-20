@@ -32,6 +32,10 @@ data class PlayerStats(
     val x01BestLegDarts: Int,
     /** Average darts thrown per X01 leg played. 0.0 if none. */
     val x01AvgDartsPerLeg: Double,
+    /** Total X01 legs won (across all completed legs + finished current legs). */
+    val x01LegsWon: Int,
+    /** X01 matches (games) won. */
+    val x01MatchesWon: Int,
     // Cricket
     val cricketGamesPlayed: Int,
     val cricketGamesWon: Int,
@@ -92,6 +96,8 @@ object StatsAggregator {
         var checkoutAttempts = 0
         var bestLegDarts = 0
         var x01Legs = 0
+        var x01LegsWon = 0
+        var x01MatchesWon = 0
 
         for (r in records) {
             val idx = r.state.players.indexOfFirst { it.name == name }
@@ -102,46 +108,61 @@ object StatsAggregator {
             when (val s = r.state) {
                 is X01State -> {
                     x01Played++
-                    x01Legs++
-                    val ps = s.perPlayer[idx]
-                    val turns = ps.turns
-                    x01TotalPoints += X01Stats.pointsScored(ps, s.startScore).toLong()
-                    x01TotalDarts += (turns.size * 3).toLong()
-                    x01HighTurn = maxOf(x01HighTurn, X01Stats.highestTurn(ps))
-                    X01Stats.checkout(ps)?.let {
-                        x01HighCheckout = maxOf(x01HighCheckout, it)
-                    }
+                    if (s.winnerIndices.contains(idx)) x01MatchesWon++
 
-                    // Scoring buckets: a busted turn scores 0, so only count
-                    // applied (non-bust) entered values.
-                    for (t in turns) {
-                        if (t.bust) continue
-                        if (t.entered == 180) oneEighties++
-                        if (t.entered >= 140) oneFortyPlus++
-                        if (t.entered >= 100) tonPlus++
-                    }
+                    // Aggregate across EVERY leg this player played: each
+                    // completed leg's snapshot plus the in-progress current leg.
+                    // This makes a multi-leg match report the same per-metric
+                    // figures it would as a sequence of single-leg games.
+                    val legStates = s.allLegStatesFor(idx)
+                    legStates.forEachIndexed { legIndex, ps ->
+                        x01Legs++
+                        val turns = ps.turns
+                        x01TotalPoints += X01Stats.pointsScored(ps, s.startScore).toLong()
+                        x01TotalDarts += (turns.size * 3).toLong()
+                        x01HighTurn = maxOf(x01HighTurn, X01Stats.highestTurn(ps))
+                        X01Stats.checkout(ps)?.let {
+                            x01HighCheckout = maxOf(x01HighCheckout, it)
+                        }
 
-                    // First-9: first three turns of this leg. Busts count as 9
-                    // darts scoring 0 points, consistent with threeDartAverage.
-                    for (t in turns.take(3)) {
-                        firstNinePoints += t.applied.toLong()
-                        firstNineDarts += 3L
-                    }
+                        // Scoring buckets: a busted turn scores 0, so only count
+                        // applied (non-bust) entered values.
+                        for (t in turns) {
+                            if (t.bust) continue
+                            if (t.entered == 180) oneEighties++
+                            if (t.entered >= 140) oneFortyPlus++
+                            if (t.entered >= 100) tonPlus++
+                        }
 
-                    // Checkout opportunities & hits (see object-level comment).
-                    for (t in turns) {
-                        if (t.scoreBefore <= 170) checkoutAttempts++
-                        if (t.finished) checkoutHits++
-                    }
+                        // First-9: first three turns of this leg. Busts count as
+                        // 9 darts scoring 0 points, consistent with the average.
+                        for (t in turns.take(3)) {
+                            firstNinePoints += t.applied.toLong()
+                            firstNineDarts += 3L
+                        }
 
-                    // Best leg / darts per leg: only legs this player won have a
-                    // meaningful "darts to finish" figure (an unfinished or lost
-                    // leg has no checkout dart).
-                    if (r.state.winnerIndices.contains(idx) &&
-                        turns.lastOrNull()?.finished == true) {
-                        val dartsToFinish = turns.size * 3
-                        if (bestLegDarts == 0 || dartsToFinish < bestLegDarts) {
-                            bestLegDarts = dartsToFinish
+                        // Checkout opportunities & hits (see object-level comment).
+                        for (t in turns) {
+                            if (t.scoreBefore <= 170) checkoutAttempts++
+                            if (t.finished) checkoutHits++
+                        }
+
+                        // Did this player win THIS leg? A completed leg is won by
+                        // its recorded winnerIndex; the current leg is won only if
+                        // the player is in winnerIndices (i.e. they won the match
+                        // on this leg). Both surface as a finished last turn.
+                        val isCompletedLeg = legIndex < s.completedLegs.size
+                        val wonThisLeg = if (isCompletedLeg) {
+                            s.completedLegs[legIndex].winnerIndex == idx
+                        } else {
+                            s.winnerIndices.contains(idx)
+                        }
+                        if (wonThisLeg && turns.lastOrNull()?.finished == true) {
+                            x01LegsWon++
+                            val dartsToFinish = turns.size * 3
+                            if (bestLegDarts == 0 || dartsToFinish < bestLegDarts) {
+                                bestLegDarts = dartsToFinish
+                            }
                         }
                     }
                 }
@@ -184,6 +205,8 @@ object StatsAggregator {
             x01CheckoutAttempts = checkoutAttempts,
             x01BestLegDarts = bestLegDarts,
             x01AvgDartsPerLeg = avgDartsPerLeg,
+            x01LegsWon = x01LegsWon,
+            x01MatchesWon = x01MatchesWon,
             cricketGamesPlayed = cricketPlayed,
             cricketGamesWon = cricketWon,
             halfItGamesPlayed = halfItPlayed,

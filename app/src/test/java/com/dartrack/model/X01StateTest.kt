@@ -228,4 +228,134 @@ class X01StateTest {
         val s = game(start = 501, "A", "B").applyTurn(60)
         assertEquals(null, X01Stats.checkout(s.perPlayer[0]))
     }
+
+    // ---------------------------------------------------------------- match play
+
+    private fun match(
+        start: Int = 501,
+        doubleOut: Boolean = false,
+        legsToWin: Int = 3,
+        vararg names: String,
+    ) = X01State.new(players(*names), startScore = start, doubleOut = doubleOut,
+        legsToWin = legsToWin)
+
+    /** Win the leg for whoever is currently to throw (single-out, start small). */
+    private fun winLegForCurrent(s: X01State): X01State =
+        s.applyTurn(s.currentPlayerScore())
+
+    @Test
+    fun singleLeg_isDefault_andBehavesAsBefore() {
+        val s = game(start = 40, doubleOut = false, "A", "B")
+        assertEquals(1, s.legsToWin)
+        assertFalse(s.isMatch)
+        val won = s.applyTurn(40)
+        assertTrue(won.isFinished, "single leg finishes the game")
+        assertEquals(listOf(0), won.winnerIndices)
+        assertEquals(1, won.completedLegs.size)
+        assertEquals(1, won.legsWonBy(0))
+    }
+
+    @Test
+    fun match_firstLegWin_doesNotEndMatch_andStartsNextLeg() {
+        var s = match(start = 40, legsToWin = 3, "A", "B")
+        s = s.applyTurn(40) // A wins leg 1
+        assertFalse(s.isFinished, "match not over after one leg of three")
+        assertEquals(1, s.legsWonBy(0))
+        assertEquals(0, s.legsWonBy(1))
+        assertEquals(1, s.completedLegs.size)
+        // Next leg reset: both back to start; B (rotated starter) throws first.
+        assertEquals(40, s.scoreFor(0))
+        assertEquals(40, s.scoreFor(1))
+        assertEquals(1, s.startingPlayerIndex)
+        assertEquals(1, s.currentPlayerIndex)
+        assertTrue(s.perPlayer.all { it.turns.isEmpty() })
+    }
+
+    @Test
+    fun match_winsWhenReachingLegsToWin() {
+        // first to 2; A wins leg1, then leg2 (A starts leg1, B starts leg2).
+        var s = match(start = 40, legsToWin = 2, "A", "B")
+        s = s.applyTurn(40)          // A wins leg 1, B to throw leg 2
+        assertEquals(1, s.currentPlayerIndex)
+        s = s.applyTurn(0)           // B throws, no score
+        assertEquals(0, s.currentPlayerIndex)
+        s = s.applyTurn(40)          // A wins leg 2 -> match
+        assertTrue(s.isFinished)
+        assertEquals(listOf(0), s.winnerIndices)
+        assertEquals(2, s.legsWonBy(0))
+        assertEquals(2, s.completedLegs.size)
+        assertEquals(0, s.currentPlayerIndex, "cursor stays on match winner")
+    }
+
+    @Test
+    fun match_undoAcrossLegBoundary_restoresPreviousLeg() {
+        var s = match(start = 40, legsToWin = 3, "A", "B")
+        s = s.applyTurn(40) // A wins leg 1 -> leg 2 started, B to throw
+        assertEquals(1, s.completedLegs.size)
+        assertEquals(1, s.currentPlayerIndex)
+
+        val undone = s.undoLast()
+        // Leg 1 restored as in-progress with A holding the winning turn.
+        assertEquals(0, undone.completedLegs.size)
+        assertEquals(0, undone.legsWonBy(0))
+        assertEquals(0, undone.currentPlayerIndex, "cursor back on the winner")
+        assertEquals(0, undone.startingPlayerIndex, "starter rolled back")
+        assertFalse(undone.isFinished)
+        // The winning turn is back in perPlayer (score reflects the checkout).
+        assertEquals(0, undone.scoreFor(0))
+        assertEquals(1, undone.perPlayer[0].turns.size)
+        assertTrue(undone.perPlayer[0].turns.single().finished)
+    }
+
+    @Test
+    fun match_undoAfterMatchWin_clearsMatchAndReopensFinalLeg() {
+        var s = match(start = 40, legsToWin = 2, "A", "B")
+        s = s.applyTurn(40)  // A wins leg 1
+        s = s.applyTurn(0)   // B throws leg 2
+        s = s.applyTurn(40)  // A wins leg 2 -> match over
+        assertTrue(s.isFinished)
+        assertEquals(2, s.completedLegs.size)
+
+        val undone = s.undoLast()
+        assertFalse(undone.isFinished, "match win cleared")
+        assertTrue(undone.winnerIndices.isEmpty())
+        assertEquals(1, undone.legsWonBy(0), "decremented back to one leg")
+        assertEquals(1, undone.completedLegs.size)
+        assertEquals(0, undone.currentPlayerIndex)
+        // A is back to needing the final checkout (winning turn dropped).
+        assertEquals(40, undone.scoreFor(0))
+        assertTrue(undone.perPlayer[0].turns.isEmpty())
+    }
+
+    @Test
+    fun match_normalUndoWithinLeg_stillWorks() {
+        var s = match(start = 501, legsToWin = 3, "A", "B")
+        s = s.applyTurn(60) // A
+        s = s.applyTurn(45) // B
+        val undone = s.undoLast()
+        assertEquals(1, undone.currentPlayerIndex)
+        assertTrue(undone.perPlayer[1].turns.isEmpty())
+        assertEquals(441, undone.scoreFor(0))
+        assertEquals(0, undone.completedLegs.size, "no leg boundary crossed")
+    }
+
+    @Test
+    fun match_stats_aggregateAcrossLegs() {
+        // Small start so realistic 0..180 turns can finish a leg.
+        // A finishes each won leg with 120 (highest turn / checkout = 120).
+        var s = match(start = 120, legsToWin = 2, "A", "B")
+        // leg 1: A 120 (single-out finish). A starts leg 1.
+        s = s.applyTurn(120)
+        assertEquals(1, s.legsWonBy(0))
+        // leg 2: B starts. B 0, A 120 finish -> A wins match.
+        s = s.applyTurn(0)   // B
+        s = s.applyTurn(120) // A wins match
+        assertTrue(s.isFinished)
+        val legs = s.allLegStatesFor(0)
+        assertEquals(2, legs.size)
+        // Each leg: 120 points scored; total across both = 240.
+        assertEquals(240, X01Stats.pointsScored(legs, 120))
+        assertEquals(120, X01Stats.highestTurn(legs))
+        assertEquals(120, X01Stats.highestCheckout(legs))
+    }
 }

@@ -89,7 +89,8 @@ fun X01GameScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                "X01 · start ${state.startScore}${if (state.doubleOut) " · DO" else ""}",
+                "X01 · start ${state.startScore}${if (state.doubleOut) " · DO" else ""}" +
+                    if (state.isMatch) " · first to ${state.legsToWin} legs" else "",
                 fontSize = 14.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.weight(1f),
@@ -101,6 +102,18 @@ fun X01GameScreen(
                 )
             }
             TextButton(onClick = onExit) { Text("Exit") }
+        }
+
+        if (state.isMatch) {
+            Text(
+                "Legs  " + state.players.indices.joinToString("  –  ") {
+                    state.legsWonBy(it).toString()
+                } + "   (leg ${state.completedLegs.size + 1})",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
+            )
         }
 
         state.players.forEachIndexed { idx, p ->
@@ -123,7 +136,9 @@ fun X01GameScreen(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            p.name + if (isWinner) "  🏆" else "",
+                            p.name +
+                                (if (state.isMatch) "  (${state.legsWonBy(idx)} legs)" else "") +
+                                (if (isWinner) "  🏆" else ""),
                             fontWeight = FontWeight.SemiBold,
                             fontSize = 16.sp,
                         )
@@ -173,7 +188,11 @@ fun X01GameScreen(
             Card(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        "Winner: ${state.winnerIndices.joinToString { state.players[it].name }}",
+                        (if (state.isMatch) "Match winner: " else "Winner: ") +
+                            state.winnerIndices.joinToString { state.players[it].name } +
+                            if (state.isMatch) "  (${state.winnerIndices.joinToString {
+                                state.legsWonBy(it).toString()
+                            }} legs)" else "",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                     )
