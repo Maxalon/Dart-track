@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Undo
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -22,9 +23,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 
 /**
  * Numeric keypad for entering a 3-dart turn total. Shows the in-progress
@@ -53,16 +57,24 @@ fun ScoreNumpad(
     val withinRange = parsed != null && parsed in 0..maxValue
     val displayed = if (entry.isBlank()) "0" else entry
     val invalid = parsed == null || parsed > maxValue
+    val haptics = LocalHapticFeedback.current
+
+    // Large, glanceable targets sized for arm's-length use on an 8.dp rhythm.
+    val keyHeight = 68.dp
+    val actionHeight = 64.dp
+    val rowSpacing = 8.dp
+
     Column(modifier = modifier.fillMaxWidth().padding(8.dp)) {
+        // Pending value display: kept prominent and centered.
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(64.dp),
+                .height(72.dp),
             contentAlignment = Alignment.Center,
         ) {
             Text(
                 text = displayed,
-                fontSize = 40.sp,
+                style = MaterialTheme.typography.displayMedium,
                 fontWeight = FontWeight.Bold,
                 color = if (invalid) MaterialTheme.colorScheme.error
                         else MaterialTheme.colorScheme.onBackground,
@@ -71,77 +83,114 @@ fun ScoreNumpad(
         if (invalid) {
             Text(
                 "Max $maxValue",
-                fontSize = 12.sp,
+                style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.error,
                 modifier = Modifier.padding(start = 4.dp, bottom = 4.dp),
             )
         }
         val rows = listOf(
-            listOf("1","2","3"),
-            listOf("4","5","6"),
-            listOf("7","8","9"),
+            listOf("1", "2", "3"),
+            listOf("4", "5", "6"),
+            listOf("7", "8", "9"),
         )
         rows.forEach { row ->
             Row(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.fillMaxWidth().padding(vertical = rowSpacing / 2),
+                horizontalArrangement = Arrangement.spacedBy(rowSpacing),
             ) {
                 row.forEach { d ->
-                    DigitButton(d, modifier = Modifier.weight(1f)) {
+                    DigitButton(
+                        label = d,
+                        height = keyHeight,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        haptics.lightTap()
                         onEntryChange(appendDigit(entry, d, maxValue))
                     }
                 }
             }
         }
         Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.fillMaxWidth().padding(vertical = rowSpacing / 2),
+            horizontalArrangement = Arrangement.spacedBy(rowSpacing),
         ) {
-            OutlinedButton(
-                onClick = { onEntryChange("") },
-                modifier = Modifier.weight(1f).height(56.dp),
-            ) { Text("C") }
-            DigitButton("0", modifier = Modifier.weight(1f)) {
+            // Clear: tonal, visually distinct from digits and from confirm.
+            FilledTonalButton(
+                onClick = {
+                    haptics.lightTap()
+                    onEntryChange("")
+                },
+                modifier = Modifier.weight(1f).height(keyHeight),
+                shape = MaterialTheme.shapes.medium,
+            ) {
+                Text("C", style = MaterialTheme.typography.titleLarge)
+            }
+            DigitButton(
+                label = "0",
+                height = keyHeight,
+                modifier = Modifier.weight(1f),
+            ) {
+                haptics.lightTap()
                 onEntryChange(appendDigit(entry, "0", maxValue))
             }
-            OutlinedButton(
+            // Backspace: tonal, matches clear styling.
+            FilledTonalButton(
                 onClick = {
-                    if (entry.isNotEmpty()) onEntryChange(entry.dropLast(1))
+                    if (entry.isNotEmpty()) {
+                        haptics.lightTap()
+                        onEntryChange(entry.dropLast(1))
+                    }
                 },
-                modifier = Modifier.weight(1f).height(56.dp),
+                modifier = Modifier.weight(1f).height(keyHeight),
+                shape = MaterialTheme.shapes.medium,
             ) {
                 Icon(Icons.Default.Backspace, contentDescription = "Backspace")
             }
         }
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(rowSpacing))
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(rowSpacing),
         ) {
             if (onUndo != null) {
+                // Undo: outlined, secondary affordance.
                 OutlinedButton(
-                    onClick = onUndo,
-                    modifier = Modifier.weight(1f).height(56.dp),
+                    onClick = {
+                        haptics.lightTap()
+                        onUndo()
+                    },
+                    modifier = Modifier.weight(1f).height(actionHeight),
+                    shape = MaterialTheme.shapes.medium,
                 ) {
                     Icon(Icons.Default.Undo, contentDescription = null)
-                    Spacer(Modifier.size(4.dp))
-                    Text("Undo")
+                    Spacer(Modifier.size(8.dp))
+                    Text("Undo", style = MaterialTheme.typography.titleMedium)
                 }
             }
+            // Confirm: primary, filled, dominant target.
             Button(
                 onClick = {
                     val v = entry.toIntOrNull() ?: return@Button
-                    if (v in 0..maxValue) onConfirm(v)
+                    if (v in 0..maxValue) {
+                        haptics.confirmTap()
+                        onConfirm(v)
+                    }
                 },
                 enabled = confirmEnabled && withinRange,
-                modifier = Modifier.weight(2f).height(56.dp),
+                modifier = Modifier.weight(2f).height(actionHeight),
+                shape = MaterialTheme.shapes.medium,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
                 ),
             ) {
                 Icon(Icons.Default.Check, contentDescription = null)
-                Spacer(Modifier.size(4.dp))
-                Text("Confirm", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.size(8.dp))
+                Text(
+                    "Confirm",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
+                )
             }
         }
     }
@@ -156,15 +205,35 @@ private fun appendDigit(current: String, digit: String, maxValue: Int): String {
 }
 
 @Composable
-private fun DigitButton(label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+private fun DigitButton(
+    label: String,
+    height: Dp,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
     Button(
         onClick = onClick,
-        modifier = modifier.height(56.dp),
+        modifier = modifier.height(height),
+        shape = MaterialTheme.shapes.medium,
         colors = ButtonDefaults.buttonColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant,
             contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         ),
     ) {
-        Text(label, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
+        Text(
+            label,
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.SemiBold,
+        )
     }
+}
+
+/** Light tap for digit/backspace/clear; degrades to no-op if unsupported. */
+private fun HapticFeedback.lightTap() {
+    runCatching { performHapticFeedback(HapticFeedbackType.TextHandleMove) }
+}
+
+/** Stronger feedback for confirm; degrades to no-op if unsupported. */
+private fun HapticFeedback.confirmTap() {
+    runCatching { performHapticFeedback(HapticFeedbackType.LongPress) }
 }
