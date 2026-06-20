@@ -47,7 +47,8 @@ class ShanghaiTest {
         // Round 2 target 2, two singles = (2*1)*2 = 4 -> total 6.
         s = s.applyTurn(2, 0, 0)
         assertEquals(6, s.perPlayer[0].total)
-        assertEquals(2, s.currentTarget(0))
+        // After two rounds the player is now aiming at round 3's number.
+        assertEquals(3, s.currentTarget(0))
     }
 
     @Test
