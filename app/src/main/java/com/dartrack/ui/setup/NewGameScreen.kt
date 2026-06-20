@@ -2,6 +2,7 @@ package com.dartrack.ui.setup
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -45,6 +46,7 @@ import com.dartrack.model.X01State
 import kotlinx.coroutines.launch
 import java.util.UUID
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun NewGameScreen(
     onCancel: () -> Unit,
