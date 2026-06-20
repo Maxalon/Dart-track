@@ -9,8 +9,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -25,6 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dartrack.data.GameRepository
+import com.dartrack.data.HistoryExport
 import com.dartrack.model.GameMode
 import java.text.DateFormat
 import java.util.Date
@@ -47,6 +52,12 @@ fun HistoryScreen(
         ) {
             Text("History", fontSize = 22.sp, fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f))
+            IconButton(
+                onClick = { HistoryExport.shareHistory(context, games) },
+                enabled = games.isNotEmpty(),
+            ) {
+                Icon(Icons.Default.Share, contentDescription = "Export history")
+            }
             TextButton(onClick = onBack) { Text("Back") }
         }
         if (games.isEmpty()) {
