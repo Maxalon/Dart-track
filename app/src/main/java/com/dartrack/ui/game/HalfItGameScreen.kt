@@ -10,10 +10,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material.icons.filled.VolumeUp
@@ -84,8 +84,8 @@ fun HalfItGameScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(8.dp),
+            .statusBarsPadding()
+            .padding(horizontal = 8.dp),
     ) {
         // ---- Top bar: mode summary, caller toggle, exit. ------------------
         Row(
@@ -109,94 +109,97 @@ fun HalfItGameScreen(
             TextButton(onClick = onExit) { Text("Exit") }
         }
 
-        // ---- HERO: the current round + target, dominant & glanceable. -----
+        // ---- Compact round/target indicator (not a giant hero card). ------
         if (!state.isFinished) {
-            HalfItHero(state, target)
+            HalfItHeader(state, target)
         }
 
-        // ---- Per-player cards: bold accent for the active thrower. --------
-        state.players.forEachIndexed { idx, p ->
-            val ps = state.perPlayer[idx]
-            val active = idx == state.currentPlayerIndex && !state.isFinished
-            val isWinner = state.winnerIndices.contains(idx)
+        // ---- Players area: absorbs spare vertical space (no scroll). The
+        // active thrower's row is the prominent/expanded one (PlayerCard
+        // already bolds + enlarges the active row).
+        Column(modifier = Modifier.weight(1f)) {
+            state.players.forEachIndexed { idx, p ->
+                val ps = state.perPlayer[idx]
+                val active = idx == state.currentPlayerIndex && !state.isFinished
+                val isWinner = state.winnerIndices.contains(idx)
 
-            PlayerCard(
-                name = p.name,
-                ps = ps,
-                active = active,
-                isWinner = isWinner,
-            )
+                PlayerCard(
+                    name = p.name,
+                    ps = ps,
+                    active = active,
+                    isWinner = isWinner,
+                )
+            }
         }
-
-        Spacer(Modifier.height(8.dp))
 
         if (state.isFinished) {
-            ElevatedCard(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
-                Column(modifier = Modifier.padding(20.dp)) {
+            ElevatedCard(
+                modifier = Modifier.fillMaxWidth().padding(8.dp).navigationBarsPadding(),
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
                     Text(
                         "Winner: ${state.winnerIndices.joinToString { state.players[it].name }}",
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
                     )
                     Spacer(Modifier.height(8.dp))
-                    TextButton(onClick = onExit) { Text("Back to home") }
-                    TextButton(onClick = { vm.undoHalfIt() }) { Text("Undo last turn") }
+                    Row {
+                        TextButton(onClick = onExit) { Text("Back to home") }
+                        TextButton(onClick = { vm.undoHalfIt() }) { Text("Undo last turn") }
+                    }
                 }
             }
         } else {
-            ScoreNumpad(
-                entry = entry,
-                onEntryChange = { entry = it },
-                onConfirm = { v ->
-                    announceHalfIt(v)
-                    vm.applyHalfItTurn(v)
-                    entry = ""
-                },
-                onUndo = { vm.undoHalfIt(); entry = "" },
-                maxValue = maxValue,
-            )
+            // ---- Bottom controls: numpad kept clear of the nav bar. -------
+            Column(modifier = Modifier.navigationBarsPadding()) {
+                ScoreNumpad(
+                    entry = entry,
+                    onEntryChange = { entry = it },
+                    onConfirm = { v ->
+                        announceHalfIt(v)
+                        vm.applyHalfItTurn(v)
+                        entry = ""
+                    },
+                    onUndo = { vm.undoHalfIt(); entry = "" },
+                    maxValue = maxValue,
+                )
+            }
         }
     }
 }
 
 /**
- * Hero panel: the current round and its target, the dominant element on the
- * screen so the thrower can tell at a glance what they are aiming at. Mirrors the
- * X01 hero treatment (primary surface, extra-large shape, elevation).
+ * Compact round/target indicator (e.g. "Round 6/9 · Any Triple") as a small
+ * header — not a giant hero card — so the screen fits without scrolling.
  */
 @Composable
-private fun HalfItHero(state: HalfItState, target: HalfItTarget?) {
-    val activeName = state.players.getOrNull(state.currentPlayerIndex)?.name ?: ""
-
+private fun HalfItHeader(state: HalfItState, target: HalfItTarget?) {
     Surface(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
-        shape = MaterialTheme.shapes.extraLarge,
-        color = MaterialTheme.colorScheme.primary,
-        contentColor = MaterialTheme.colorScheme.onPrimary,
-        tonalElevation = 6.dp,
-        shadowElevation = 6.dp,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.tertiaryContainer,
+        contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+        tonalElevation = 2.dp,
     ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 18.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
                 "Round ${state.currentRound + 1}/${HALF_IT_ROUNDS.size}",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                textAlign = TextAlign.Center,
-            )
-            Text(
-                target?.label ?: "Complete",
-                fontSize = 56.sp,
-                fontWeight = FontWeight.Black,
-                textAlign = TextAlign.Center,
-            )
-            Text(
-                if (activeName.isNotEmpty()) "$activeName to throw · miss halves your score"
-                else "miss halves your score",
                 style = MaterialTheme.typography.labelLarge,
-                textAlign = TextAlign.Center,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                "  ·  " + (target?.label ?: "Complete"),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                "miss halves",
+                style = MaterialTheme.typography.labelMedium,
+                textAlign = TextAlign.End,
             )
         }
     }

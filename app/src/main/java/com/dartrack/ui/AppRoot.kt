@@ -16,8 +16,11 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.dartrack.data.GameRepository
 import com.dartrack.ui.game.AroundTheClockScreen
+import com.dartrack.ui.game.BobsTwentySevenScreen
+import com.dartrack.ui.game.Catch40Screen
 import com.dartrack.ui.game.CricketGameScreen
 import com.dartrack.ui.game.HalfItGameScreen
+import com.dartrack.ui.game.ShanghaiScreen
 import com.dartrack.ui.game.X01GameScreen
 import com.dartrack.ui.history.GameDetailScreen
 import com.dartrack.ui.history.HistoryScreen
@@ -111,6 +114,18 @@ fun AppRoot() {
                     onExit = { nav.popBackStack("home", inclusive = false) },
                 )
                 com.dartrack.model.GameMode.AROUND_CLOCK -> AroundTheClockScreen(
+                    recordId = id,
+                    onExit = { nav.popBackStack("home", inclusive = false) },
+                )
+                com.dartrack.model.GameMode.BOBS_27 -> BobsTwentySevenScreen(
+                    recordId = id,
+                    onExit = { nav.popBackStack("home", inclusive = false) },
+                )
+                com.dartrack.model.GameMode.SHANGHAI -> ShanghaiScreen(
+                    recordId = id,
+                    onExit = { nav.popBackStack("home", inclusive = false) },
+                )
+                com.dartrack.model.GameMode.CATCH_40 -> Catch40Screen(
                     recordId = id,
                     onExit = { nav.popBackStack("home", inclusive = false) },
                 )

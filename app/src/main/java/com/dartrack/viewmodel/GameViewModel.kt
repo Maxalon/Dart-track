@@ -7,8 +7,11 @@ import com.dartrack.data.GameRecord
 import com.dartrack.data.GameRepository
 import com.dartrack.model.GameState
 import com.dartrack.model.AroundTheClockState
+import com.dartrack.model.BobsTwentySevenState
+import com.dartrack.model.Catch40State
 import com.dartrack.model.CricketState
 import com.dartrack.model.HalfItState
+import com.dartrack.model.ShanghaiState
 import com.dartrack.model.X01State
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -66,6 +69,21 @@ class GameViewModel(
         mutate { (it as AroundTheClockState).applyTurn(hits) }
 
     fun undoAroundClock() = mutate { (it as AroundTheClockState).undoLast() }
+
+    fun applyBobs27Turn(hits: Int) =
+        mutate { (it as BobsTwentySevenState).applyTurn(hits) }
+
+    fun undoBobs27() = mutate { (it as BobsTwentySevenState).undoLast() }
+
+    fun applyShanghaiTurn(singles: Int, doubles: Int, triples: Int) =
+        mutate { (it as ShanghaiState).applyTurn(singles, doubles, triples) }
+
+    fun undoShanghai() = mutate { (it as ShanghaiState).undoLast() }
+
+    fun applyCatch40Turn(hits: Int) =
+        mutate { (it as Catch40State).applyTurn(hits) }
+
+    fun undoCatch40() = mutate { (it as Catch40State).undoLast() }
 
     class Factory(
         private val repo: GameRepository,

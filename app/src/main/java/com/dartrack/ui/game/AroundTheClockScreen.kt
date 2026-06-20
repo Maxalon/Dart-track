@@ -8,9 +8,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CardDefaults
@@ -59,8 +59,8 @@ fun AroundTheClockScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(8.dp),
+            .statusBarsPadding()
+            .padding(horizontal = 8.dp),
     ) {
         // ---- Top bar: mode summary, exit. --------------------------------
         Row(
@@ -76,181 +76,186 @@ fun AroundTheClockScreen(
             TextButton(onClick = onExit) { Text("Exit") }
         }
 
-        // ---- HERO: the active player's current target, dominant. ---------
+        // ---- Compact current-target indicator (not a giant hero card). ----
         if (!state.isFinished) {
-            HeroTarget(state)
+            TargetIndicator(state)
         }
 
-        // ---- Per-player cards: bold accent for the active thrower. --------
-        state.players.forEachIndexed { idx, p ->
-            val ps = state.perPlayer[idx]
-            val active = idx == state.currentPlayerIndex && !state.isFinished
-            val isWinner = state.winnerIndices.contains(idx)
+        // ---- Players area: absorbs spare vertical space (no scroll). The
+        // active thrower's row is the prominent/expanded one (bold name + big
+        // cleared count).
+        Column(modifier = Modifier.weight(1f)) {
+            state.players.forEachIndexed { idx, p ->
+                val ps = state.perPlayer[idx]
+                val active = idx == state.currentPlayerIndex && !state.isFinished
+                val isWinner = state.winnerIndices.contains(idx)
 
-            val containerColor = when {
-                isWinner -> MaterialTheme.colorScheme.secondary
-                active -> MaterialTheme.colorScheme.primaryContainer
-                else -> MaterialTheme.colorScheme.surfaceVariant
-            }
-            val contentColor = when {
-                isWinner -> MaterialTheme.colorScheme.onSecondary
-                active -> MaterialTheme.colorScheme.onPrimaryContainer
-                else -> MaterialTheme.colorScheme.onSurfaceVariant
-            }
+                val containerColor = when {
+                    isWinner -> MaterialTheme.colorScheme.secondary
+                    active -> MaterialTheme.colorScheme.primaryContainer
+                    else -> MaterialTheme.colorScheme.surfaceVariant
+                }
+                val contentColor = when {
+                    isWinner -> MaterialTheme.colorScheme.onSecondary
+                    active -> MaterialTheme.colorScheme.onPrimaryContainer
+                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                }
 
-            ElevatedCard(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
-                colors = CardDefaults.elevatedCardColors(
-                    containerColor = containerColor,
-                    contentColor = contentColor,
-                ),
-                elevation = CardDefaults.elevatedCardElevation(
-                    defaultElevation = if (active || isWinner) 8.dp else 1.dp,
-                ),
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                ElevatedCard(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+                    colors = CardDefaults.elevatedCardColors(
+                        containerColor = containerColor,
+                        contentColor = contentColor,
+                    ),
+                    elevation = CardDefaults.elevatedCardElevation(
+                        defaultElevation = if (active || isWinner) 8.dp else 1.dp,
+                    ),
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            p.name + (if (isWinner) "  🏆" else ""),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = if (active) FontWeight.Bold else FontWeight.SemiBold,
-                        )
-                        Spacer(Modifier.height(2.dp))
-                        Text(
-                            if (ps.finished) "Finished · ${ps.darts} darts"
-                            else "on ${ps.currentTarget} / $AROUND_CLOCK_LAST_TARGET · ${ps.darts} darts",
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text(
-                            "${ps.cleared}/$AROUND_CLOCK_LAST_TARGET",
-                            fontSize = if (active) 40.sp else 32.sp,
-                            fontWeight = FontWeight.Bold,
-                        )
-                        Text(
-                            "cleared",
-                            style = MaterialTheme.typography.labelSmall,
-                        )
+                    Row(
+                        modifier = Modifier.fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = if (active) 12.dp else 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                p.name + (if (isWinner) "  🏆" else ""),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = if (active) FontWeight.Bold else FontWeight.SemiBold,
+                            )
+                            Text(
+                                if (ps.finished) "Finished · ${ps.darts} darts"
+                                else "on ${ps.currentTarget} / $AROUND_CLOCK_LAST_TARGET · ${ps.darts} darts",
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text(
+                                "${ps.cleared}/$AROUND_CLOCK_LAST_TARGET",
+                                fontSize = if (active) 44.sp else 30.sp,
+                                fontWeight = FontWeight.Bold,
+                            )
+                            Text(
+                                "cleared",
+                                style = MaterialTheme.typography.labelSmall,
+                            )
+                        }
                     }
                 }
             }
         }
 
-        Spacer(Modifier.height(8.dp))
-
         if (state.isFinished) {
-            ElevatedCard(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
-                Column(modifier = Modifier.padding(20.dp)) {
+            ElevatedCard(
+                modifier = Modifier.fillMaxWidth().padding(8.dp).navigationBarsPadding(),
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
                     Text(
                         "Winner: " + state.winnerIndices.joinToString { state.players[it].name },
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
                     )
                     Spacer(Modifier.height(8.dp))
-                    TextButton(onClick = onExit) { Text("Back to home") }
-                    TextButton(onClick = { vm.undoAroundClock(); pending = null }) {
-                        Text("Undo last turn")
+                    Row {
+                        TextButton(onClick = onExit) { Text("Back to home") }
+                        TextButton(onClick = { vm.undoAroundClock(); pending = null }) {
+                            Text("Undo last turn")
+                        }
                     }
                 }
             }
         } else {
-            // ---- Hits entry: 0..AROUND_CLOCK_MAX_HITS. --------------------
-            Text(
-                "How many of the next targets did you hit?",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(8.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                (0..AROUND_CLOCK_MAX_HITS).forEach { n ->
-                    val selected = pending == n
+            // ---- Hits entry + actions: pinned clear of the nav bar. -------
+            Column(modifier = Modifier.navigationBarsPadding()) {
+                Text(
+                    "How many of the next targets did you hit?",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    (0..AROUND_CLOCK_MAX_HITS).forEach { n ->
+                        val selected = pending == n
+                        Button(
+                            onClick = { pending = n },
+                            modifier = Modifier.weight(1f).height(54.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (selected)
+                                    MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.surfaceVariant,
+                                contentColor = if (selected)
+                                    MaterialTheme.colorScheme.onPrimary
+                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                            ),
+                        ) {
+                            Text(n.toString(), fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    OutlinedButton(
+                        onClick = { vm.undoAroundClock(); pending = null },
+                        modifier = Modifier.weight(1f).height(54.dp),
+                    ) { Text("Undo") }
                     Button(
-                        onClick = { pending = n },
-                        modifier = Modifier.weight(1f).height(56.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (selected)
-                                MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.surfaceVariant,
-                            contentColor = if (selected)
-                                MaterialTheme.colorScheme.onPrimary
-                            else MaterialTheme.colorScheme.onSurfaceVariant,
-                        ),
+                        onClick = {
+                            val v = pending ?: return@Button
+                            vm.applyAroundClockTurn(v)
+                            pending = null
+                        },
+                        enabled = pending != null,
+                        modifier = Modifier.weight(2f).height(54.dp),
                     ) {
-                        Text(n.toString(), fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
+                        Text("Confirm", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                OutlinedButton(
-                    onClick = { vm.undoAroundClock(); pending = null },
-                    modifier = Modifier.weight(1f).height(56.dp),
-                ) { Text("Undo") }
-                Button(
-                    onClick = {
-                        val v = pending ?: return@Button
-                        vm.applyAroundClockTurn(v)
-                        pending = null
-                    },
-                    enabled = pending != null,
-                    modifier = Modifier.weight(2f).height(56.dp),
-                ) {
-                    Text("Confirm", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-                }
-            }
-            Spacer(Modifier.height(8.dp))
         }
     }
 }
 
 /**
- * Hero panel: the active player's current target as the dominant element on the
- * screen, animated so it counts to its new value after each turn. Readable across
- * a room off a wall/stand.
+ * Compact current-target indicator: who is throwing and the number they are
+ * aiming at, as a small header (not a giant hero card) so the screen fits
+ * without scrolling. The target is animated so it counts to its new value.
  */
 @Composable
-private fun HeroTarget(state: AroundTheClockState) {
+private fun TargetIndicator(state: AroundTheClockState) {
     val idx = state.currentPlayerIndex
     val target = state.currentTarget(idx)
-    val animated by animateIntAsState(targetValue = target, label = "heroTarget")
+    val animated by animateIntAsState(targetValue = target, label = "atcTarget")
     val activeName = state.players.getOrNull(idx)?.name ?: ""
 
     Surface(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
-        shape = MaterialTheme.shapes.extraLarge,
-        color = MaterialTheme.colorScheme.primary,
-        contentColor = MaterialTheme.colorScheme.onPrimary,
-        tonalElevation = 6.dp,
-        shadowElevation = 6.dp,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.tertiaryContainer,
+        contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+        tonalElevation = 2.dp,
     ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 18.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
                 "$activeName to throw",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
-                textAlign = TextAlign.Center,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                "aiming at  ",
+                style = MaterialTheme.typography.labelLarge,
             )
             Text(
                 animated.toString(),
-                fontSize = 96.sp,
+                fontSize = 32.sp,
                 fontWeight = FontWeight.Black,
-                textAlign = TextAlign.Center,
-            )
-            Text(
-                "aiming at",
-                style = MaterialTheme.typography.labelLarge,
                 textAlign = TextAlign.Center,
             )
         }
