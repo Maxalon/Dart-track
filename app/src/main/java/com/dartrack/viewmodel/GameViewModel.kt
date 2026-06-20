@@ -7,6 +7,7 @@ import com.dartrack.data.GameRecord
 import com.dartrack.data.GameRepository
 import com.dartrack.model.GameState
 import com.dartrack.model.AroundTheClockState
+import com.dartrack.model.BobsTwentySevenState
 import com.dartrack.model.CricketState
 import com.dartrack.model.HalfItState
 import com.dartrack.model.X01State
@@ -66,6 +67,11 @@ class GameViewModel(
         mutate { (it as AroundTheClockState).applyTurn(hits) }
 
     fun undoAroundClock() = mutate { (it as AroundTheClockState).undoLast() }
+
+    fun applyBobs27Turn(hits: Int) =
+        mutate { (it as BobsTwentySevenState).applyTurn(hits) }
+
+    fun undoBobs27() = mutate { (it as BobsTwentySevenState).undoLast() }
 
     class Factory(
         private val repo: GameRepository,
