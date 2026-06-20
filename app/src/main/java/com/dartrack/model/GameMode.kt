@@ -6,7 +6,7 @@ import kotlinx.serialization.Serializable
 enum class GameMode { X01, CRICKET, HALF_IT, AROUND_CLOCK, BOBS_27, SHANGHAI, CATCH_40 }
 
 @Serializable
-data class GamePlayer(val name: String)
+data class GamePlayer(val name: String, val id: String = "")
 
 @Serializable
 sealed interface GameState {
