@@ -4,10 +4,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Card
@@ -17,7 +21,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -26,16 +32,23 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dartrack.data.GameRepository
 import com.dartrack.data.StatsAggregator
+import com.dartrack.data.StatsRange
 import com.dartrack.data.TrendStats
+import com.dartrack.data.filterByRange
 
 @Composable
 fun StatsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val repo = remember { GameRepository.get(context) }
     val games by repo.games.collectAsState()
-    val stats = remember(games) { StatsAggregator.aggregate(games) }
 
-    Column(modifier = Modifier.fillMaxSize().padding(8.dp)) {
+    var range by remember { mutableStateOf(StatsRange.ALL) }
+    val filtered = remember(games, range) {
+        filterByRange(games, range, System.currentTimeMillis())
+    }
+    val stats = remember(filtered) { StatsAggregator.aggregate(filtered) }
+
+    Column(modifier = Modifier.fillMaxSize().statusBarsPadding().padding(8.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -45,12 +58,22 @@ fun StatsScreen(onBack: () -> Unit) {
             TextButton(onClick = onBack) { Text("Back") }
         }
         Spacer(Modifier.height(4.dp))
+        RangeSelector(
+            selected = range,
+            onSelect = { range = it },
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+        )
         if (stats.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("No games yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    "No games in this period",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         } else {
-            LazyColumn {
+            LazyColumn(
+                contentPadding = WindowInsets.navigationBars.asPaddingValues(),
+            ) {
                 items(stats, key = { it.name }) { s ->
                     Card(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
                         Column(modifier = Modifier.padding(12.dp)) {
@@ -78,8 +101,8 @@ fun StatsScreen(onBack: () -> Unit) {
                                 Text("Best leg: $bestLeg · " +
                                     "avg darts/leg ${"%.1f".format(s.x01AvgDartsPerLeg)}")
 
-                                val trend = remember(games, s.name) {
-                                    TrendStats.threeDartAverageTrend(games, s.name)
+                                val trend = remember(filtered, s.name) {
+                                    TrendStats.threeDartAverageTrend(filtered, s.name)
                                 }
                                 if (trend.isNotEmpty()) {
                                     Spacer(Modifier.height(8.dp))
