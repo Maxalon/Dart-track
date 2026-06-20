@@ -6,12 +6,14 @@ lifecycle = "2.8.6"
 activityCompose = "1.9.3"
 composeBom = "2025.10.01"
 # Material 3 Expressive APIs (MaterialExpressiveTheme, MotionScheme.expressive,
-# ButtonGroup, Modifier.animateWidth) are public (experimental, opt-in) in the
-# 1.4.0 STABLE release. We pin material3 explicitly here so it overrides the
-# version the Compose BOM/transitive deps would otherwise resolve (which was
-# landing on an older 1.3.x where these symbols are `internal`/unresolved).
-# The rest of the Compose artifacts stay on the BOM.
-material3 = "1.4.0"
+# ButtonGroup, Modifier.animateWidth) are PUBLIC only on the material3 alpha
+# track. In the 1.4.0 STABLE release these symbols are `internal` (CI on commit
+# b0cfd79 with BOM-resolved material3 1.4.0 failed with "Cannot access ...: it
+# is internal in file"). Pin material3 to 1.5.0-alpha01, which exposes them
+# publicly behind @ExperimentalMaterial3ExpressiveApi and pairs with the
+# Compose 1.10 line shipped by the BOM above. CI on commit 0811903 with this
+# pin compiled and passed unit tests. The rest of Compose stays on the BOM.
+material3 = "1.5.0-alpha01"
 navigationCompose = "2.8.3"
 serializationJson = "1.7.3"
 datastorePreferences = "1.1.1"
