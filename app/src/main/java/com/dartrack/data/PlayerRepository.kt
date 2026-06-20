@@ -70,6 +70,57 @@ class PlayerRepository private constructor(private val file: File) {
     /** Snapshot of the registry, sorted by name, for selection UIs. */
     fun all(): List<Player> = _players.value
 
+    /**
+     * Renames the player [id] to [newName] (trimmed). Enforces case-insensitive
+     * uniqueness: if a *different* player already has the same normalized name
+     * the rename is a no-op and returns false. Rejects blank [newName] with
+     * [IllegalArgumentException]. A no-op rename (same name, or id missing)
+     * returns false; an applied rename persists and returns true.
+     */
+    suspend fun rename(id: String, newName: String): Boolean = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            val outcome = resolveRename(_players.value, id, newName)
+            if (outcome.changed) persistLocked(outcome.players)
+            outcome.changed
+        }
+    }
+
+    /**
+     * Removes the player [id] from the registry and persists. No-op (returns
+     * false) if no such player exists. Games keep their stored id/name; they
+     * simply no longer resolve to a registry player.
+     */
+    suspend fun delete(id: String): Boolean = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            val current = _players.value
+            val next = removePlayer(current, id)
+            if (next.size == current.size) return@withLock false
+            persistLocked(next)
+            true
+        }
+    }
+
+    /**
+     * Merges player [fromId] into [intoId]: reassigns every game record from
+     * [fromId] to [intoId] (taking [intoId]'s current name), then removes
+     * [fromId] from the registry. No-op if [fromId] == [intoId] or either id is
+     * missing from the registry. Returns the number of game records reassigned
+     * (0 when it is a no-op, or when no record referenced [fromId]).
+     */
+    suspend fun merge(fromId: String, intoId: String, gameRepo: GameRepository): Int =
+        withContext(Dispatchers.IO) {
+            if (fromId == intoId) return@withContext 0
+            val into = byId(intoId) ?: return@withContext 0
+            byId(fromId) ?: return@withContext 0
+            val reassigned = gameRepo.reassignPlayer(fromId, intoId, into.name)
+            mutex.withLock {
+                val current = _players.value
+                val next = removePlayer(current, fromId)
+                if (next.size != current.size) persistLocked(next)
+            }
+            reassigned
+        }
+
     private fun persistLocked(list: List<Player>) {
         val sorted = sortByName(list)
         file.parentFile?.mkdirs()
@@ -142,3 +193,36 @@ fun resolveAddPlayer(
 /** Stable ordering for the registry: by name (case-insensitive), then id. */
 fun sortByName(players: List<Player>): List<Player> =
     players.sortedWith(compareBy({ it.name.lowercase() }, { it.id }))
+
+/** Result of attempting to rename a player in an existing list. */
+data class RenameOutcome(
+    val players: List<Player>,
+    /** True if the rename was applied (the list changed). */
+    val changed: Boolean,
+)
+
+/**
+ * Pure rename logic for the registry. Trims [newName] and rejects blank. Returns
+ * the unchanged list with [RenameOutcome.changed] = false when:
+ *  - no player has [id], or
+ *  - the trimmed name equals the player's current name (nothing to do), or
+ *  - a *different* player already uses the same normalized (trimmed/lowercased)
+ *    name (uniqueness violation — rejected as a no-op).
+ * Otherwise returns a new list with that player's name replaced and changed = true.
+ */
+fun resolveRename(existing: List<Player>, id: String, newName: String): RenameOutcome {
+    val trimmed = newName.trim()
+    require(trimmed.isNotEmpty()) { "Player name must not be blank" }
+    val target = existing.firstOrNull { it.id == id }
+        ?: return RenameOutcome(players = existing, changed = false)
+    if (target.name == trimmed) return RenameOutcome(players = existing, changed = false)
+    val key = normalizePlayerName(trimmed)
+    val clash = existing.any { it.id != id && normalizePlayerName(it.name) == key }
+    if (clash) return RenameOutcome(players = existing, changed = false)
+    val next = existing.map { if (it.id == id) it.copy(name = trimmed) else it }
+    return RenameOutcome(players = next, changed = true)
+}
+
+/** Pure removal of the player [id] from [existing] (no-op if absent). */
+fun removePlayer(existing: List<Player>, id: String): List<Player> =
+    existing.filterNot { it.id == id }
