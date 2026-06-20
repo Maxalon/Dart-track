@@ -37,9 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -71,17 +69,6 @@ fun X01GameScreen(
     val caller = rememberCaller()
     var callerOn by rememberSaveable { mutableStateOf(false) }
 
-    val haptics = LocalHapticFeedback.current
-
-    // Fire a haptic, never letting an unavailable haptic engine crash the game.
-    fun haptic(type: HapticFeedbackType) {
-        try {
-            haptics.performHapticFeedback(type)
-        } catch (t: Throwable) {
-            // Some devices / previews have no haptic hardware; degrade silently.
-        }
-    }
-
     // Announce an X01 turn. Outcome is derived from the same pure rules the model
     // uses (see X01State.applyTurn) without mutating any state.
     fun announceX01(entered: Int, finishedOnDouble: Boolean) {
@@ -102,27 +89,8 @@ fun X01GameScreen(
         caller.speak(text, callerOn)
     }
 
-    // Pure outcome classifier (mirrors X01State.applyTurn) so we can pick the
-    // right haptic on confirm without touching the model.
-    fun outcomeOf(entered: Int, finishedOnDouble: Boolean): String {
-        val before = state.currentPlayerScore()
-        val after = before - entered
-        return when {
-            after < 0 -> "bust"
-            after == 0 && state.doubleOut && !finishedOnDouble -> "bust"
-            after == 1 && state.doubleOut -> "bust"
-            after == 0 -> "win"
-            else -> "scored"
-        }
-    }
-
-    // Apply a confirmed turn with the appropriate haptic + caller announcement.
+    // Apply a confirmed turn with the caller announcement.
     fun confirmTurn(v: Int, finishedOnDouble: Boolean) {
-        when (outcomeOf(v, finishedOnDouble)) {
-            "bust" -> haptic(HapticFeedbackType.TextHandleMove)
-            "win" -> haptic(HapticFeedbackType.LongPress)
-            else -> haptic(HapticFeedbackType.LongPress)
-        }
         announceX01(v, finishedOnDouble = finishedOnDouble)
         vm.applyX01Turn(v, finishedOnDouble = finishedOnDouble)
         entry = ""

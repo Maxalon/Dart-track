@@ -23,9 +23,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.hapticfeedback.HapticFeedback
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -57,7 +54,6 @@ fun ScoreNumpad(
     val withinRange = parsed != null && parsed in 0..maxValue
     val displayed = if (entry.isBlank()) "0" else entry
     val invalid = parsed == null || parsed > maxValue
-    val haptics = LocalHapticFeedback.current
 
     // Large, glanceable targets sized for arm's-length use on an 8.dp rhythm.
     val keyHeight = 68.dp
@@ -104,7 +100,6 @@ fun ScoreNumpad(
                         height = keyHeight,
                         modifier = Modifier.weight(1f),
                     ) {
-                        haptics.lightTap()
                         onEntryChange(appendDigit(entry, d, maxValue))
                     }
                 }
@@ -117,7 +112,6 @@ fun ScoreNumpad(
             // Clear: tonal, visually distinct from digits and from confirm.
             FilledTonalButton(
                 onClick = {
-                    haptics.lightTap()
                     onEntryChange("")
                 },
                 modifier = Modifier.weight(1f).height(keyHeight),
@@ -130,14 +124,12 @@ fun ScoreNumpad(
                 height = keyHeight,
                 modifier = Modifier.weight(1f),
             ) {
-                haptics.lightTap()
                 onEntryChange(appendDigit(entry, "0", maxValue))
             }
             // Backspace: tonal, matches clear styling.
             FilledTonalButton(
                 onClick = {
                     if (entry.isNotEmpty()) {
-                        haptics.lightTap()
                         onEntryChange(entry.dropLast(1))
                     }
                 },
@@ -156,7 +148,6 @@ fun ScoreNumpad(
                 // Undo: outlined, secondary affordance.
                 OutlinedButton(
                     onClick = {
-                        haptics.lightTap()
                         onUndo()
                     },
                     modifier = Modifier.weight(1f).height(actionHeight),
@@ -172,7 +163,6 @@ fun ScoreNumpad(
                 onClick = {
                     val v = entry.toIntOrNull() ?: return@Button
                     if (v in 0..maxValue) {
-                        haptics.confirmTap()
                         onConfirm(v)
                     }
                 },
@@ -226,14 +216,4 @@ private fun DigitButton(
             fontWeight = FontWeight.SemiBold,
         )
     }
-}
-
-/** Light tap for digit/backspace/clear; degrades to no-op if unsupported. */
-private fun HapticFeedback.lightTap() {
-    runCatching { performHapticFeedback(HapticFeedbackType.TextHandleMove) }
-}
-
-/** Stronger feedback for confirm; degrades to no-op if unsupported. */
-private fun HapticFeedback.confirmTap() {
-    runCatching { performHapticFeedback(HapticFeedbackType.LongPress) }
 }
