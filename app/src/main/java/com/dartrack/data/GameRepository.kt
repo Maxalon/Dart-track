@@ -50,6 +50,33 @@ class GameRepository private constructor(private val file: File) {
         }
     }
 
+    /**
+     * Merges [records] into the store by [GameRecord.id]: ids that already
+     * exist are skipped (idempotent re-import), new ids are added. The whole
+     * merge + persist runs under the same [mutex] and reuses [persistLocked]'s
+     * atomic write path, so the on-disk games.json can never be left partially
+     * written. Returns how many records were imported vs. skipped.
+     */
+    suspend fun importRecords(records: List<GameRecord>): ImportResult =
+        withContext(Dispatchers.IO) {
+            mutex.withLock {
+                val list = _games.value.toMutableList()
+                val existing = list.mapTo(HashSet()) { it.id }
+                var imported = 0
+                var skipped = 0
+                for (record in records) {
+                    if (existing.add(record.id)) {
+                        list.add(record)
+                        imported++
+                    } else {
+                        skipped++
+                    }
+                }
+                if (imported > 0) persistLocked(list)
+                ImportResult(imported = imported, skipped = skipped)
+            }
+        }
+
     suspend fun delete(id: String) = withContext(Dispatchers.IO) {
         mutex.withLock {
             val list = _games.value.filterNot { it.id == id }
