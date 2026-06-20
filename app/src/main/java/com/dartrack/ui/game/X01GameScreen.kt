@@ -1,5 +1,6 @@
 package com.dartrack.ui.game
 
+import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -10,16 +11,20 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -32,8 +37,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -63,6 +71,17 @@ fun X01GameScreen(
     val caller = rememberCaller()
     var callerOn by rememberSaveable { mutableStateOf(false) }
 
+    val haptics = LocalHapticFeedback.current
+
+    // Fire a haptic, never letting an unavailable haptic engine crash the game.
+    fun haptic(type: HapticFeedbackType) {
+        try {
+            haptics.performHapticFeedback(type)
+        } catch (t: Throwable) {
+            // Some devices / previews have no haptic hardware; degrade silently.
+        }
+    }
+
     // Announce an X01 turn. Outcome is derived from the same pure rules the model
     // uses (see X01State.applyTurn) without mutating any state.
     fun announceX01(entered: Int, finishedOnDouble: Boolean) {
@@ -83,7 +102,39 @@ fun X01GameScreen(
         caller.speak(text, callerOn)
     }
 
-    Column(modifier = Modifier.fillMaxSize().padding(8.dp)) {
+    // Pure outcome classifier (mirrors X01State.applyTurn) so we can pick the
+    // right haptic on confirm without touching the model.
+    fun outcomeOf(entered: Int, finishedOnDouble: Boolean): String {
+        val before = state.currentPlayerScore()
+        val after = before - entered
+        return when {
+            after < 0 -> "bust"
+            after == 0 && state.doubleOut && !finishedOnDouble -> "bust"
+            after == 1 && state.doubleOut -> "bust"
+            after == 0 -> "win"
+            else -> "scored"
+        }
+    }
+
+    // Apply a confirmed turn with the appropriate haptic + caller announcement.
+    fun confirmTurn(v: Int, finishedOnDouble: Boolean) {
+        when (outcomeOf(v, finishedOnDouble)) {
+            "bust" -> haptic(HapticFeedbackType.TextHandleMove)
+            "win" -> haptic(HapticFeedbackType.LongPress)
+            else -> haptic(HapticFeedbackType.LongPress)
+        }
+        announceX01(v, finishedOnDouble = finishedOnDouble)
+        vm.applyX01Turn(v, finishedOnDouble = finishedOnDouble)
+        entry = ""
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(8.dp),
+    ) {
+        // ---- Top bar: mode summary, caller toggle, exit. ------------------
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -91,7 +142,7 @@ fun X01GameScreen(
             Text(
                 "X01 · start ${state.startScore}${if (state.doubleOut) " · DO" else ""}" +
                     if (state.isMatch) " · first to ${state.legsToWin} legs" else "",
-                fontSize = 14.sp,
+                style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.weight(1f),
             )
@@ -99,39 +150,52 @@ fun X01GameScreen(
                 Icon(
                     if (callerOn) Icons.Default.VolumeUp else Icons.Default.VolumeOff,
                     contentDescription = if (callerOn) "Mute caller" else "Enable caller",
+                    tint = if (callerOn) MaterialTheme.colorScheme.primary
+                           else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             TextButton(onClick = onExit) { Text("Exit") }
         }
 
+        // ---- Match leg scoreboard (only for multi-leg matches). ----------
         if (state.isMatch) {
-            Text(
-                "Legs  " + state.players.indices.joinToString("  –  ") {
-                    state.legsWonBy(it).toString()
-                } + "   (leg ${state.completedLegs.size + 1})",
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
-            )
+            LegScoreboard(state)
         }
 
+        // ---- HERO: the current player's remaining score, dominant. -------
+        if (!state.isFinished) {
+            HeroRemaining(state)
+        }
+
+        // ---- Per-player cards: bold accent for the active thrower. --------
         state.players.forEachIndexed { idx, p ->
             val ps = state.perPlayer[idx]
             val active = idx == state.currentPlayerIndex && !state.isFinished
             val isWinner = state.winnerIndices.contains(idx)
-            Card(
+
+            val containerColor = when {
+                isWinner -> MaterialTheme.colorScheme.secondary
+                active -> MaterialTheme.colorScheme.primaryContainer
+                else -> MaterialTheme.colorScheme.surfaceVariant
+            }
+            val contentColor = when {
+                isWinner -> MaterialTheme.colorScheme.onSecondary
+                active -> MaterialTheme.colorScheme.onPrimaryContainer
+                else -> MaterialTheme.colorScheme.onSurfaceVariant
+            }
+
+            ElevatedCard(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = when {
-                        isWinner -> MaterialTheme.colorScheme.secondary
-                        active -> MaterialTheme.colorScheme.primaryContainer
-                        else -> MaterialTheme.colorScheme.surfaceVariant
-                    },
+                colors = CardDefaults.elevatedCardColors(
+                    containerColor = containerColor,
+                    contentColor = contentColor,
+                ),
+                elevation = CardDefaults.elevatedCardElevation(
+                    defaultElevation = if (active || isWinner) 8.dp else 1.dp,
                 ),
             ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(12.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
@@ -139,26 +203,34 @@ fun X01GameScreen(
                             p.name +
                                 (if (state.isMatch) "  (${state.legsWonBy(idx)} legs)" else "") +
                                 (if (isWinner) "  🏆" else ""),
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 16.sp,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = if (active) FontWeight.Bold else FontWeight.SemiBold,
                         )
+                        Spacer(Modifier.height(2.dp))
                         Text(
                             "avg ${"%.1f".format(X01Stats.threeDartAverage(ps, state.startScore))}" +
                                 " · darts ${ps.turns.size * 3}" +
                                 (X01Stats.highestTurn(ps).takeIf { it > 0 }?.let { " · best $it" } ?: ""),
-                            fontSize = 12.sp,
+                            style = MaterialTheme.typography.bodySmall,
                         )
+                        ps.turns.lastOrNull()?.let { last ->
+                            Text(
+                                "last " + if (last.bust) "BUST" else last.entered.toString(),
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Medium,
+                            )
+                        }
                     }
                     Text(
                         state.scoreFor(idx).toString(),
-                        fontSize = 32.sp,
+                        fontSize = if (active) 44.sp else 34.sp,
                         fontWeight = FontWeight.Bold,
                     )
                 }
                 val recentTurns = ps.turns.takeLast(3)
                 if (recentTurns.isNotEmpty()) {
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         recentTurns.forEach { t ->
@@ -169,11 +241,13 @@ fun X01GameScreen(
                                         if (t.bust) MaterialTheme.colorScheme.errorContainer
                                         else MaterialTheme.colorScheme.surface
                                     )
-                                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                                    .padding(horizontal = 10.dp, vertical = 4.dp),
                             ) {
                                 Text(
                                     if (t.bust) "BUST" else t.entered.toString(),
-                                    fontSize = 12.sp,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = if (t.bust) MaterialTheme.colorScheme.onErrorContainer
+                                            else MaterialTheme.colorScheme.onSurface,
                                 )
                             }
                         }
@@ -182,18 +256,18 @@ fun X01GameScreen(
             }
         }
 
-        Spacer(Modifier.weight(1f))
+        Spacer(Modifier.height(8.dp))
 
         if (state.isFinished) {
-            Card(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
-                Column(modifier = Modifier.padding(16.dp)) {
+            ElevatedCard(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
+                Column(modifier = Modifier.padding(20.dp)) {
                     Text(
                         (if (state.isMatch) "Match winner: " else "Winner: ") +
                             state.winnerIndices.joinToString { state.players[it].name } +
                             if (state.isMatch) "  (${state.winnerIndices.joinToString {
                                 state.legsWonBy(it).toString()
                             }} legs)" else "",
-                        fontSize = 20.sp,
+                        style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
                     )
                     Spacer(Modifier.height(8.dp))
@@ -202,17 +276,10 @@ fun X01GameScreen(
                 }
             }
         } else {
+            // ---- Prominent checkout chip (only when finishable). ----------
             val routes = Checkout.suggest(state.currentPlayerScore(), state.doubleOut)
             if (routes.isNotEmpty()) {
-                Text(
-                    "Checkout: " + routes.take(2).joinToString(" · "),
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 4.dp),
-                )
+                CheckoutChip(routes)
             }
             ScoreNumpad(
                 entry = entry,
@@ -223,9 +290,7 @@ fun X01GameScreen(
                     if (state.doubleOut && wouldFinish) {
                         pendingFinish = v
                     } else {
-                        announceX01(v, finishedOnDouble = !state.doubleOut)
-                        vm.applyX01Turn(v, finishedOnDouble = !state.doubleOut)
-                        entry = ""
+                        confirmTurn(v, finishedOnDouble = !state.doubleOut)
                     }
                 },
                 onUndo = { vm.undoX01(); entry = "" },
@@ -243,20 +308,132 @@ fun X01GameScreen(
             },
             confirmButton = {
                 TextButton(onClick = {
-                    announceX01(v, finishedOnDouble = true)
-                    vm.applyX01Turn(v, finishedOnDouble = true)
+                    confirmTurn(v, finishedOnDouble = true)
                     pendingFinish = null
-                    entry = ""
                 }) { Text("Yes — winner") }
             },
             dismissButton = {
                 TextButton(onClick = {
-                    announceX01(v, finishedOnDouble = false)
-                    vm.applyX01Turn(v, finishedOnDouble = false)
+                    confirmTurn(v, finishedOnDouble = false)
                     pendingFinish = null
-                    entry = ""
                 }) { Text("No — bust") }
             },
         )
+    }
+}
+
+/**
+ * Hero panel: the active player's remaining score as the dominant element on the
+ * screen, animated so it counts to its new value after each turn. Readable across
+ * a room off a wall/stand.
+ */
+@Composable
+private fun HeroRemaining(state: X01State) {
+    val target = state.currentPlayerScore()
+    val animated by animateIntAsState(targetValue = target, label = "heroRemaining")
+    val activeName = state.players.getOrNull(state.currentPlayerIndex)?.name ?: ""
+
+    Surface(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
+        shape = MaterialTheme.shapes.extraLarge,
+        color = MaterialTheme.colorScheme.primary,
+        contentColor = MaterialTheme.colorScheme.onPrimary,
+        tonalElevation = 6.dp,
+        shadowElevation = 6.dp,
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 18.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                "$activeName to throw",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center,
+            )
+            Text(
+                animated.toString(),
+                fontSize = 96.sp,
+                fontWeight = FontWeight.Black,
+                textAlign = TextAlign.Center,
+            )
+            Text(
+                "remaining",
+                style = MaterialTheme.typography.labelLarge,
+                textAlign = TextAlign.Center,
+            )
+        }
+    }
+}
+
+/**
+ * Match leg scoreboard: legs won per player, plus the current leg number.
+ */
+@Composable
+private fun LegScoreboard(state: X01State) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+        ),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "Legs",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    state.players.indices.joinToString("  –  ") {
+                        state.legsWonBy(it).toString()
+                    },
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+            Text(
+                "Leg ${state.completedLegs.size + 1}",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/**
+ * Prominent checkout suggestion using the "checkout/scored" accent
+ * (tertiaryContainer). Surfaces up to two routes from [Checkout.suggest].
+ */
+@Composable
+private fun CheckoutChip(routes: List<String>) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.tertiaryContainer,
+        contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+        tonalElevation = 2.dp,
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                "Checkout",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                "  " + routes.take(2).joinToString("   ·   "),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
     }
 }
