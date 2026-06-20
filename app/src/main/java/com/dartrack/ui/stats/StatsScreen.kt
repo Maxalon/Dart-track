@@ -56,10 +56,26 @@ fun StatsScreen(onBack: () -> Unit) {
                             Text(s.name, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                             Text("Games: ${s.gamesPlayed} · wins: ${s.gamesWon}")
                             if (s.x01GamesPlayed > 0) {
-                                Text("X01: ${s.x01GamesPlayed} games · " +
+                                Spacer(Modifier.height(6.dp))
+                                Text(
+                                    "X01",
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                                Text("${s.x01GamesPlayed} games · " +
                                     "avg ${"%.1f".format(s.x01ThreeDartAvg)} · " +
-                                    "best turn ${s.x01HighestTurn} · " +
+                                    "first 9 ${"%.1f".format(s.x01FirstNineAvg)}")
+                                Text("Best turn ${s.x01HighestTurn} · " +
                                     "best checkout ${s.x01HighestCheckout}")
+                                Text("100+: ${s.x01TonPlus} · " +
+                                    "140+: ${s.x01OneFortyPlus} · " +
+                                    "180: ${s.x01OneEighties}")
+                                Text("Checkout %: ${"%.1f".format(s.x01CheckoutPct * 100)}% " +
+                                    "(${s.x01CheckoutHits}/${s.x01CheckoutAttempts})")
+                                val bestLeg = if (s.x01BestLegDarts > 0)
+                                    "${s.x01BestLegDarts} darts" else "—"
+                                Text("Best leg: $bestLeg · " +
+                                    "avg darts/leg ${"%.1f".format(s.x01AvgDartsPerLeg)}")
                             }
                             if (s.cricketGamesPlayed > 0) {
                                 Text("Cricket: ${s.cricketGamesPlayed} games · " +
