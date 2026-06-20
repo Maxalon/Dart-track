@@ -2,6 +2,8 @@ package com.dartrack.ui.setup
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -44,6 +46,7 @@ import com.dartrack.model.X01State
 import kotlinx.coroutines.launch
 import java.util.UUID
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun NewGameScreen(
     onCancel: () -> Unit,
@@ -67,7 +70,10 @@ fun NewGameScreen(
         Spacer(Modifier.height(16.dp))
 
         Text("Mode", fontWeight = FontWeight.SemiBold)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             GameMode.entries.forEach { m ->
                 FilterChip(
                     selected = mode == m,
@@ -88,7 +94,10 @@ fun NewGameScreen(
         if (mode == GameMode.X01) {
             Spacer(Modifier.height(16.dp))
             Text("Start score", fontWeight = FontWeight.SemiBold)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 X01State.SUPPORTED_STARTS.forEach { s ->
                     FilterChip(
                         selected = startScore == s,
