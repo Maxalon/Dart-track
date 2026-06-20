@@ -359,6 +359,213 @@ class X01StateTest {
         assertEquals(120, X01Stats.highestCheckout(legs))
     }
 
+    // ------------------------------------------------------------------- sets
+
+    private fun setMatch(
+        start: Int = 501,
+        doubleOut: Boolean = false,
+        legsToWin: Int = 2,
+        setsToWin: Int = 2,
+        vararg names: String,
+    ) = X01State.new(players(*names), startScore = start, doubleOut = doubleOut,
+        legsToWin = legsToWin, setsToWin = setsToWin)
+
+    @Test
+    fun singleSet_isDefault_andIdenticalToLegsOnly() {
+        // Default setsToWin = 1: behaves exactly like a legs-only first-to-2 match.
+        val s = match(start = 40, doubleOut = false, legsToWin = 2, "A", "B")
+        assertEquals(1, s.setsToWin)
+        assertEquals(0, s.setsWonBy(0))
+        assertEquals(0, s.setsWonBy(1))
+        // isMatch driven by legs as before.
+        assertTrue(s.isMatch)
+
+        var g = s
+        g = g.applyTurn(40)      // A wins leg 1
+        assertFalse(g.isFinished)
+        assertEquals(1, g.legsWonBy(0))
+        assertEquals(0, g.setsWonBy(0), "no sets layer: setWins stay zero")
+        g = g.applyTurn(0)       // B
+        g = g.applyTurn(40)      // A wins leg 2 -> match (single set)
+        assertTrue(g.isFinished)
+        assertEquals(listOf(0), g.winnerIndices)
+        assertEquals(2, g.legsWonBy(0))
+        assertEquals(0, g.setsWonBy(0), "single-set match never increments setWins")
+        assertEquals(2, g.completedLegs.size)
+    }
+
+    @Test
+    fun setsToWin_makesIsMatchTrueEvenWithSingleLeg() {
+        val s = X01State.new(players("A", "B"), startScore = 40, doubleOut = false,
+            legsToWin = 1, setsToWin = 3)
+        assertTrue(s.isMatch, "multi-set is a match even at one leg per set")
+    }
+
+    /** Drive A (index 0) to check out the current leg with a 40; if B is up,
+     *  B throws 0 first so the cursor returns to A. Single-out, start 40. */
+    private fun aWinsLeg(s0: X01State): X01State {
+        var s = s0
+        if (s.currentPlayerIndex != 0) s = s.applyTurn(0)
+        return s.applyTurn(40)
+    }
+
+    @Test
+    fun twoSetMatch_setRollover_resetsLegsAndIncrementsSets() {
+        // first-to-2 legs per set, first-to-2 sets. Single-out, start 40 so
+        // every checkout is a single 40.
+        var s = setMatch(start = 40, doubleOut = false, legsToWin = 2, setsToWin = 2, "A", "B")
+        // Set 1: A wins both legs.
+        s = s.applyTurn(40)              // leg1: A (A started)
+        assertEquals(1, s.legsWonBy(0))
+        assertEquals(1, s.currentPlayerIndex, "B starts leg 2")
+        s = s.applyTurn(0)               // B throws
+        s = s.applyTurn(40)              // leg2: A wins -> SET 1 to A
+        assertFalse(s.isFinished, "match not over: A has 1 set of 2")
+        assertEquals(1, s.setsWonBy(0))
+        assertEquals(0, s.setsWonBy(1))
+        assertEquals(0, s.legsWonBy(0), "legs reset at set rollover")
+        assertEquals(0, s.legsWonBy(1))
+        assertEquals(2, s.completedLegs.size, "completedLegs keep accumulating")
+        // New set: fresh leg, scores reset.
+        assertTrue(s.perPlayer.all { it.turns.isEmpty() })
+        assertEquals(40, s.scoreFor(0))
+        assertEquals(40, s.scoreFor(1))
+
+        // Set 2: A wins both legs again -> match over.
+        s = aWinsLeg(s)                  // S2 L1: A
+        assertEquals(1, s.legsWonBy(0))
+        assertEquals(1, s.setsWonBy(0), "still 1 set; only 1 leg into set 2")
+        assertFalse(s.isFinished)
+        s = aWinsLeg(s)                  // S2 L2: A -> match
+        assertTrue(s.isFinished, "A wins set 2 -> match over")
+        assertEquals(listOf(0), s.winnerIndices)
+        assertEquals(2, s.setsWonBy(0))
+        assertEquals(0, s.setsWonBy(1))
+        assertEquals(4, s.completedLegs.size)
+    }
+
+    /** Symmetric helper: drive B (index 1) to check out the current leg. */
+    private fun bWinsLeg(s0: X01State): X01State {
+        var s = s0
+        if (s.currentPlayerIndex != 1) s = s.applyTurn(0)
+        return s.applyTurn(40)
+    }
+
+    @Test
+    fun twoSetMatch_splitSets_thirdSetDecides() {
+        // first-to-2 legs/set, first-to-2 sets. A takes set 1, B takes set 2,
+        // A takes set 3 -> A wins 2-1 in sets.
+        var s = setMatch(start = 40, doubleOut = false, legsToWin = 2, setsToWin = 2, "A", "B")
+        // Set 1 -> A (A wins L1 & L2)
+        s = aWinsLeg(s); s = aWinsLeg(s)
+        assertEquals(1, s.setsWonBy(0)); assertEquals(0, s.setsWonBy(1))
+        // Set 2 -> B (B wins L1 & L2)
+        s = bWinsLeg(s); s = bWinsLeg(s)
+        assertFalse(s.isFinished)
+        assertEquals(1, s.setsWonBy(0)); assertEquals(1, s.setsWonBy(1))
+        assertEquals(0, s.legsWonBy(0)); assertEquals(0, s.legsWonBy(1))
+        // Set 3 (decider) -> A wins -> match.
+        s = aWinsLeg(s); s = aWinsLeg(s)
+        assertTrue(s.isFinished)
+        assertEquals(listOf(0), s.winnerIndices)
+        assertEquals(2, s.setsWonBy(0)); assertEquals(1, s.setsWonBy(1))
+    }
+
+    @Test
+    fun setMatch_undoAcrossSetBoundary_restoresPriorSet() {
+        // After A wins set 1 (2 legs), undo should reopen the set-deciding leg
+        // with the set un-won and legs back at the pre-checkout tally.
+        var s = setMatch(start = 40, doubleOut = false, legsToWin = 2, setsToWin = 2, "A", "B")
+        s = s.applyTurn(40)                       // S1 L1: A (legWins A=1)
+        assertEquals(1, s.currentPlayerIndex)
+        s = s.applyTurn(0)                        // B throws L2
+        s = s.applyTurn(40)                       // S1 L2: A -> SET 1 won by A
+        assertEquals(1, s.setsWonBy(0))
+        assertEquals(0, s.legsWonBy(0), "legs reset after set")
+        assertEquals(2, s.completedLegs.size)
+        assertTrue(s.perPlayer.all { it.turns.isEmpty() }, "fresh leg for set 2")
+
+        val undone = s.undoLast()
+        // Set 1 reopened: A back to 1 leg (the L1 win), the set un-won, the
+        // deciding L2 restored as an in-progress leg with A on the checkout.
+        assertEquals(0, undone.setsWonBy(0), "set win reversed")
+        assertEquals(0, undone.setsWonBy(1))
+        assertEquals(1, undone.legsWonBy(0), "back to A having 1 leg in the set")
+        assertEquals(0, undone.legsWonBy(1))
+        assertEquals(1, undone.completedLegs.size, "deciding leg popped")
+        assertFalse(undone.isFinished)
+        assertEquals(0, undone.currentPlayerIndex, "cursor on the leg winner (A)")
+        // The L2 winning turn is restored on the board.
+        assertEquals(0, undone.scoreFor(0))
+        assertTrue(undone.perPlayer[0].turns.last().finished)
+        // Starter rolled back from the set-2 starter to the deciding leg's starter.
+        assertEquals(1, undone.startingPlayerIndex)
+    }
+
+    @Test
+    fun setMatch_undoAcrossLegBoundaryWithinSet() {
+        // Undo crossing a plain leg boundary inside a set must NOT touch setWins.
+        var s = setMatch(start = 40, doubleOut = false, legsToWin = 2, setsToWin = 2, "A", "B")
+        s = s.applyTurn(40)                       // S1 L1: A wins, leg2 started
+        assertEquals(1, s.legsWonBy(0))
+        assertEquals(0, s.setsWonBy(0))
+        assertEquals(1, s.completedLegs.size)
+        assertTrue(s.perPlayer.all { it.turns.isEmpty() })
+
+        val undone = s.undoLast()
+        assertEquals(0, undone.completedLegs.size)
+        assertEquals(0, undone.legsWonBy(0), "leg win reversed within set")
+        assertEquals(0, undone.setsWonBy(0), "sets untouched")
+        assertEquals(0, undone.currentPlayerIndex)
+        assertEquals(0, undone.startingPlayerIndex)
+        assertFalse(undone.isFinished)
+        assertEquals(0, undone.scoreFor(0), "A's checkout restored")
+        assertTrue(undone.perPlayer[0].turns.single().finished)
+    }
+
+    @Test
+    fun setMatch_undoMatchDecidingCheckout_reopensFinalSetAndLeg() {
+        var s = setMatch(start = 40, doubleOut = false, legsToWin = 2, setsToWin = 2, "A", "B")
+        // Set 1 -> A
+        s = aWinsLeg(s); s = aWinsLeg(s)
+        assertEquals(1, s.setsWonBy(0))
+        // Set 2 -> A wins both legs -> match.
+        s = aWinsLeg(s); s = aWinsLeg(s)
+        assertTrue(s.isFinished)
+        assertEquals(2, s.setsWonBy(0))
+        val completedBefore = s.completedLegs.size
+
+        val undone = s.undoLast()
+        assertFalse(undone.isFinished, "match win cleared")
+        assertTrue(undone.winnerIndices.isEmpty())
+        assertEquals(1, undone.setsWonBy(0), "deciding set reversed to 1")
+        assertEquals(1, undone.legsWonBy(0), "A back to 1 leg in the final set")
+        assertEquals(completedBefore - 1, undone.completedLegs.size)
+        assertEquals(0, undone.currentPlayerIndex)
+        // A is back needing the final checkout (winning turn dropped from board).
+        assertEquals(40, undone.scoreFor(0))
+        assertTrue(undone.perPlayer[0].turns.isEmpty())
+    }
+
+    @Test
+    fun setMatch_statsAggregateAcrossAllLegsOfAllSets() {
+        // Two sets, each two legs A wins with 120. completedLegs accumulate across
+        // sets, so allLegStatesFor sees every leg of every set.
+        var s = setMatch(start = 120, doubleOut = false, legsToWin = 2, setsToWin = 2, "A", "B")
+        fun aLeg120(st: X01State): X01State {
+            var x = st
+            if (x.currentPlayerIndex != 0) x = x.applyTurn(0)
+            return x.applyTurn(120)
+        }
+        s = aLeg120(s); s = aLeg120(s)                // S1: A wins both -> set1
+        s = aLeg120(s); s = aLeg120(s)                // S2: A wins both -> match
+        assertTrue(s.isFinished)
+        val legs = s.allLegStatesFor(0)
+        assertEquals(4, legs.size, "4 legs across 2 sets, deciding leg not doubled")
+        assertEquals(480, X01Stats.pointsScored(legs, 120))
+        assertEquals(120, X01Stats.highestCheckout(legs))
+    }
+
     @Test
     fun singleLeg_finishedViaApplyTurn_countsLegOnce() {
         // Regression: when a game finishes, applyTurn stores the deciding leg in
