@@ -18,6 +18,9 @@ import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -37,7 +40,10 @@ import com.dartrack.data.H2HRecord
 import com.dartrack.data.PlayerStatsData
 import com.dartrack.data.PlayerRepository
 import com.dartrack.data.ScoreBandDistribution
+import com.dartrack.data.StatsRange
+import com.dartrack.data.filterByRange
 import com.dartrack.data.headToHead
+import com.dartrack.data.label
 import com.dartrack.data.playerStats
 import com.dartrack.data.threeDartAvgTrendById
 import com.dartrack.model.Player
@@ -89,14 +95,26 @@ fun PlayerStatsScreen(onBack: () -> Unit) {
             modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
         )
 
-        val stats = remember(games, selected?.id) {
-            playerStats(selected?.id.orEmpty(), games)
+        var range by remember { mutableStateOf(StatsRange.ALL) }
+        RangeSelector(
+            selected = range,
+            onSelect = { range = it },
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+        )
+
+        // The filter only changes the INPUT list; every stat function recomputes
+        // from the filtered games (calendar-period semantics live in filterByRange).
+        val filtered = remember(games, range) {
+            filterByRange(games, range, System.currentTimeMillis())
         }
-        val trend = remember(games, selected?.id) {
-            threeDartAvgTrendById(selected?.id.orEmpty(), games)
+        val stats = remember(filtered, selected?.id) {
+            playerStats(selected?.id.orEmpty(), filtered)
         }
-        val h2h = remember(games, selected?.id) {
-            headToHead(selected?.id.orEmpty(), games)
+        val trend = remember(filtered, selected?.id) {
+            threeDartAvgTrendById(selected?.id.orEmpty(), filtered)
+        }
+        val h2h = remember(filtered, selected?.id) {
+            headToHead(selected?.id.orEmpty(), filtered)
         }
 
         Column(
@@ -104,6 +122,9 @@ fun PlayerStatsScreen(onBack: () -> Unit) {
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState()),
         ) {
+            if (stats.gamesPlayed == 0) {
+                EmptyPeriodCard()
+            }
             OverallCard(stats)
             if (stats.x01GamesPlayed > 0) {
                 X01Card(stats)
@@ -154,6 +175,43 @@ private fun PlayerSelector(
                     },
                 )
             }
+        }
+    }
+}
+
+/**
+ * Day / Month / Year / All-time period selector. Single-choice segmented row;
+ * default selection (All-time) is owned by the caller.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun RangeSelector(
+    selected: StatsRange,
+    onSelect: (StatsRange) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val ranges = StatsRange.entries
+    SingleChoiceSegmentedButtonRow(modifier = modifier) {
+        ranges.forEachIndexed { index, range ->
+            SegmentedButton(
+                selected = range == selected,
+                onClick = { onSelect(range) },
+                shape = SegmentedButtonDefaults.itemShape(index = index, count = ranges.size),
+            ) {
+                Text(range.label())
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmptyPeriodCard() {
+    Card(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(
+                "No games in this period",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

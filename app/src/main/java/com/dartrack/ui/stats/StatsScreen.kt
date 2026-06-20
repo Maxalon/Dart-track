@@ -17,7 +17,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -26,14 +28,21 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dartrack.data.GameRepository
 import com.dartrack.data.StatsAggregator
+import com.dartrack.data.StatsRange
 import com.dartrack.data.TrendStats
+import com.dartrack.data.filterByRange
 
 @Composable
 fun StatsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val repo = remember { GameRepository.get(context) }
     val games by repo.games.collectAsState()
-    val stats = remember(games) { StatsAggregator.aggregate(games) }
+
+    var range by remember { mutableStateOf(StatsRange.ALL) }
+    val filtered = remember(games, range) {
+        filterByRange(games, range, System.currentTimeMillis())
+    }
+    val stats = remember(filtered) { StatsAggregator.aggregate(filtered) }
 
     Column(modifier = Modifier.fillMaxSize().padding(8.dp)) {
         Row(
@@ -45,9 +54,17 @@ fun StatsScreen(onBack: () -> Unit) {
             TextButton(onClick = onBack) { Text("Back") }
         }
         Spacer(Modifier.height(4.dp))
+        RangeSelector(
+            selected = range,
+            onSelect = { range = it },
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+        )
         if (stats.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("No games yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    "No games in this period",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         } else {
             LazyColumn {
@@ -78,8 +95,8 @@ fun StatsScreen(onBack: () -> Unit) {
                                 Text("Best leg: $bestLeg · " +
                                     "avg darts/leg ${"%.1f".format(s.x01AvgDartsPerLeg)}")
 
-                                val trend = remember(games, s.name) {
-                                    TrendStats.threeDartAverageTrend(games, s.name)
+                                val trend = remember(filtered, s.name) {
+                                    TrendStats.threeDartAverageTrend(filtered, s.name)
                                 }
                                 if (trend.isNotEmpty()) {
                                     Spacer(Modifier.height(8.dp))
