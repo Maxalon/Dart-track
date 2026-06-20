@@ -90,7 +90,8 @@ data class X01State(
     fun legsWonBy(playerIndex: Int): Int = legWins.getOrElse(playerIndex) { 0 }
 
     /** Sets won by [playerIndex] so far (current set not yet counted). */
-    fun setsWonBy(playerIndex: Int): Int = setWins.getOrElse(playerIndex) { 0 }
+    fun setsWonBy(playerIndex: Int): Int =
+        if (setsToWin <= 1) 0 else setWins.getOrElse(playerIndex) { 0 }
 
     /** True when this is a multi-leg or multi-set match (UI shows scoreboard). */
     val isMatch: Boolean get() = legsToWin > 1 || setsToWin > 1

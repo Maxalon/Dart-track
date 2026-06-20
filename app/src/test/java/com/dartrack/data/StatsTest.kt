@@ -5,7 +5,7 @@ import com.dartrack.model.GamePlayer
 import com.dartrack.model.X01PlayerState
 import com.dartrack.model.X01State
 import com.dartrack.model.X01Turn
-import org.junit.Assert.assertEquals
+import kotlin.test.assertEquals
 import org.junit.Test
 
 /**
