@@ -10,6 +10,9 @@ per-player statistics. Fully offline, no ads, no accounts.
 - **X01** — 101, 201, 301, 401, 501, 701 or 901 start. Optional double-out.
   3-dart total entry per turn (numpad with confirm). Bust detection,
   finish-on-double prompt, and **live checkout suggestions** (see below).
+  **Match play**: play a single leg or first-to-N legs (1/3/5/7); the throw
+  order rotates each leg, a leg scoreboard shows legs won, and Undo works
+  across leg boundaries. Stats aggregate over every leg of a match.
 - **Cricket** — Standard scoring on 15-20 + bull. Per-target mark counters,
   +/− entry, max 9 marks per turn (3 darts × triple). Win when all targets
   closed and lead/tie on points.
@@ -43,7 +46,12 @@ per-player statistics. Fully offline, no ads, no accounts.
 - Statistics screen aggregates deep per-player numbers across all games:
   3-dart average, **first-9 average**, **checkout %**, **180s and ton+
   counts** (100+/140+), **best leg** (fewest darts) and average darts per
-  leg, best turn, best checkout, wins, and high scores (Half-It).
+  leg, legs/matches won, best turn, best checkout, wins, and high scores
+  (Half-It). A per-player **3-dart-average trend chart** shows progress over
+  time.
+- **Export** — the history screen can export all games as a JSON file via the
+  Android share sheet (same on-disk format as `games.json`), for backup or
+  moving to another device.
 
 ## Tests
 
