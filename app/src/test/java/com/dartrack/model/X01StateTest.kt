@@ -358,4 +358,20 @@ class X01StateTest {
         assertEquals(120, X01Stats.highestTurn(legs))
         assertEquals(120, X01Stats.highestCheckout(legs))
     }
+
+    @Test
+    fun singleLeg_finishedViaApplyTurn_countsLegOnce() {
+        // Regression: when a game finishes, applyTurn stores the deciding leg in
+        // BOTH completedLegs and the live perPlayer (the duplication undoLast
+        // relies on). allLegStatesFor must de-duplicate so stats count the leg
+        // once — here a single 180, not two. Building the finished state via
+        // applyTurn (not the constructor) is what exposes the bug.
+        val finished = game(start = 180, doubleOut = false, "A", "B").applyTurn(180)
+        assertTrue(finished.isFinished)
+        assertEquals(1, finished.completedLegs.size)
+        val legs = finished.allLegStatesFor(0)
+        assertEquals(1, legs.size, "deciding leg must not be counted twice")
+        assertEquals(180, X01Stats.pointsScored(legs, 180))
+        assertEquals(180, X01Stats.highestTurn(legs))
+    }
 }

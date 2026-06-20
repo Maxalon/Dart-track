@@ -75,11 +75,23 @@ data class X01State(
 
     /**
      * Every [X01PlayerState] this player has had across ALL legs: each completed
-     * leg's snapshot followed by the current in-progress leg. Used by stats so
+     * leg's snapshot, plus the current in-progress leg. Used by stats so
      * aggregates sum across legs rather than only the current leg.
+     *
+     * When the match has ended, [applyTurn] stores the deciding (winning) leg in
+     * BOTH [completedLegs] (as the last entry) and the live [perPlayer] — that
+     * duplication is what lets [undoLast] reopen the final leg. So once the match
+     * is over we must NOT also append [perPlayer] here, or every metric for the
+     * final leg would be counted twice. Legacy/finished games loaded from old
+     * JSON have an empty [completedLegs], so they still count via [perPlayer].
      */
-    fun allLegStatesFor(playerIndex: Int): List<X01PlayerState> =
-        completedLegs.map { it.perPlayer[playerIndex] } + perPlayer[playerIndex]
+    fun allLegStatesFor(playerIndex: Int): List<X01PlayerState> {
+        val completed = completedLegs.map { it.perPlayer[playerIndex] }
+        val finalLegDuplicated = winnerIndices.isNotEmpty() &&
+            completedLegs.isNotEmpty() &&
+            completedLegs.last().perPlayer == perPlayer
+        return if (finalLegDuplicated) completed else completed + perPlayer[playerIndex]
+    }
 
     /**
      * Apply a 3-dart total entered on the keypad. Returns the new state and
