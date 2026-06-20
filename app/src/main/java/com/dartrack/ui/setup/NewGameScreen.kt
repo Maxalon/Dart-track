@@ -35,6 +35,7 @@ import com.dartrack.data.GameRepository
 import com.dartrack.model.GameMode
 import com.dartrack.model.GamePlayer
 import com.dartrack.model.AroundTheClockState
+import com.dartrack.model.BobsTwentySevenState
 import com.dartrack.model.CricketState
 import com.dartrack.model.HalfItState
 import com.dartrack.model.X01State
@@ -74,6 +75,7 @@ fun NewGameScreen(
                         GameMode.CRICKET -> "Cricket"
                         GameMode.HALF_IT -> "Half-It"
                         GameMode.AROUND_CLOCK -> "Around the Clock"
+                        GameMode.BOBS_27 -> "Bob's 27"
                     }) },
                 )
             }
@@ -163,6 +165,7 @@ fun NewGameScreen(
                         GameMode.CRICKET -> CricketState.new(players)
                         GameMode.HALF_IT -> HalfItState.new(players)
                         GameMode.AROUND_CLOCK -> AroundTheClockState.new(players)
+                        GameMode.BOBS_27 -> BobsTwentySevenState.new(players)
                     }
                     val now = System.currentTimeMillis()
                     val record = GameRecord(

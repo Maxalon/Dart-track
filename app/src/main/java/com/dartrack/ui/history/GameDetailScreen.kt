@@ -32,6 +32,8 @@ import com.dartrack.data.GameRepository
 import com.dartrack.model.GameMode
 import com.dartrack.model.AROUND_CLOCK_LAST_TARGET
 import com.dartrack.model.AroundTheClockState
+import com.dartrack.model.BOBS27_LAST_DOUBLE
+import com.dartrack.model.BobsTwentySevenState
 import com.dartrack.model.CRICKET_TARGETS
 import com.dartrack.model.CricketState
 import com.dartrack.model.HalfItState
@@ -76,6 +78,7 @@ fun GameDetailScreen(
                     GameMode.CRICKET -> "Cricket"
                     GameMode.HALF_IT -> "Half-It"
                     GameMode.AROUND_CLOCK -> "Around the Clock"
+                    GameMode.BOBS_27 -> "Bob's 27"
                 }, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                 Text("Started: ${df.format(Date(rec.createdAtEpochMs))}")
                 Text("Updated: ${df.format(Date(rec.updatedAtEpochMs))}")
@@ -90,6 +93,7 @@ fun GameDetailScreen(
             is CricketState -> CricketDetail(s)
             is HalfItState -> HalfItDetail(s)
             is AroundTheClockState -> AroundTheClockDetail(s)
+            is BobsTwentySevenState -> BobsTwentySevenDetail(s)
         }
 
         Spacer(Modifier.height(12.dp))
@@ -204,6 +208,32 @@ private fun AroundTheClockDetail(s: AroundTheClockState) {
                 if (ps.turns.isNotEmpty()) {
                     Text(
                         ps.turns.joinToString(" · ") { it.hits.toString() },
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Spacer(Modifier.height(6.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun BobsTwentySevenDetail(s: BobsTwentySevenState) {
+    Card(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            s.players.forEachIndexed { idx, p ->
+                val ps = s.perPlayer[idx]
+                Text(
+                    "${p.name}: ${ps.score}" +
+                        (if (ps.out) " · OUT" else "") +
+                        " · ${ps.darts} darts",
+                    fontWeight = FontWeight.SemiBold,
+                )
+                if (ps.turns.isNotEmpty()) {
+                    Text(
+                        "doubles 1–$BOBS27_LAST_DOUBLE hits: " +
+                            ps.turns.joinToString(" · ") { it.hits.toString() },
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

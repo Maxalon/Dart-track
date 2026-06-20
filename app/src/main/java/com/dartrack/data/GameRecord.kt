@@ -3,6 +3,7 @@ package com.dartrack.data
 import com.dartrack.model.GameMode
 import com.dartrack.model.GameState
 import com.dartrack.model.AroundTheClockState
+import com.dartrack.model.BobsTwentySevenState
 import com.dartrack.model.CricketState
 import com.dartrack.model.HalfItState
 import com.dartrack.model.X01State
@@ -39,4 +40,5 @@ fun GameState.toMode(): GameMode = when (this) {
     is CricketState -> GameMode.CRICKET
     is HalfItState -> GameMode.HALF_IT
     is AroundTheClockState -> GameMode.AROUND_CLOCK
+    is BobsTwentySevenState -> GameMode.BOBS_27
 }
