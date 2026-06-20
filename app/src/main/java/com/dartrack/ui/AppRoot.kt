@@ -17,6 +17,7 @@ import androidx.navigation.compose.rememberNavController
 import com.dartrack.data.GameRepository
 import com.dartrack.ui.game.AroundTheClockScreen
 import com.dartrack.ui.game.BobsTwentySevenScreen
+import com.dartrack.ui.game.Catch40Screen
 import com.dartrack.ui.game.CricketGameScreen
 import com.dartrack.ui.game.HalfItGameScreen
 import com.dartrack.ui.game.ShanghaiScreen
@@ -121,6 +122,10 @@ fun AppRoot() {
                     onExit = { nav.popBackStack("home", inclusive = false) },
                 )
                 com.dartrack.model.GameMode.SHANGHAI -> ShanghaiScreen(
+                    recordId = id,
+                    onExit = { nav.popBackStack("home", inclusive = false) },
+                )
+                com.dartrack.model.GameMode.CATCH_40 -> Catch40Screen(
                     recordId = id,
                     onExit = { nav.popBackStack("home", inclusive = false) },
                 )
