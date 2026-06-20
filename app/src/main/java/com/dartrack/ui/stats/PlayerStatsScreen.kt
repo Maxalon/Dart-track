@@ -33,10 +33,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dartrack.data.GameRepository
+import com.dartrack.data.H2HRecord
 import com.dartrack.data.PlayerStatsData
 import com.dartrack.data.PlayerRepository
 import com.dartrack.data.ScoreBandDistribution
+import com.dartrack.data.headToHead
 import com.dartrack.data.playerStats
+import com.dartrack.data.threeDartAvgTrendById
 import com.dartrack.model.Player
 
 @Composable
@@ -89,6 +92,12 @@ fun PlayerStatsScreen(onBack: () -> Unit) {
         val stats = remember(games, selected?.id) {
             playerStats(selected?.id.orEmpty(), games)
         }
+        val trend = remember(games, selected?.id) {
+            threeDartAvgTrendById(selected?.id.orEmpty(), games)
+        }
+        val h2h = remember(games, selected?.id) {
+            headToHead(selected?.id.orEmpty(), games)
+        }
 
         Column(
             modifier = Modifier
@@ -100,6 +109,8 @@ fun PlayerStatsScreen(onBack: () -> Unit) {
                 X01Card(stats)
                 ScoreBandCard(stats.scoreBands)
             }
+            TrendCard(trend)
+            HeadToHeadCard(h2h)
             ModeSummariesCard(stats)
             Spacer(Modifier.height(16.dp))
         }
@@ -229,6 +240,42 @@ private fun BandRow(label: String, count: Int, fraction: Double) {
         Text(label, modifier = Modifier.weight(1f))
         Text("$count", modifier = Modifier.weight(1f))
         Text(pct(fraction), modifier = Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun TrendCard(points: List<com.dartrack.data.TrendPoint>) {
+    StatsCard("3-dart average trend") {
+        // TrendChart renders its own "No data yet" placeholder when empty.
+        TrendChart(points = points, modifier = Modifier.fillMaxWidth())
+    }
+}
+
+@Composable
+private fun HeadToHeadCard(records: List<H2HRecord>) {
+    StatsCard("Head-to-head") {
+        if (records.isEmpty()) {
+            Text(
+                "No data yet",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            return@StatsCard
+        }
+        Row(modifier = Modifier.fillMaxWidth()) {
+            Text("Opponent", fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(2f))
+            Text("P", fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            Text("W", fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            Text("L", fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+        }
+        Spacer(Modifier.height(2.dp))
+        records.forEach { rec ->
+            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+                Text(rec.opponentName, modifier = Modifier.weight(2f))
+                Text("${rec.played}", modifier = Modifier.weight(1f))
+                Text("${rec.won}", modifier = Modifier.weight(1f))
+                Text("${rec.lost}", modifier = Modifier.weight(1f))
+            }
+        }
     }
 }
 

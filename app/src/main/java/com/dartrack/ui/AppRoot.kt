@@ -25,6 +25,7 @@ import com.dartrack.ui.game.X01GameScreen
 import com.dartrack.ui.history.GameDetailScreen
 import com.dartrack.ui.history.HistoryScreen
 import com.dartrack.ui.home.HomeScreen
+import com.dartrack.ui.players.PlayerManagementScreen
 import com.dartrack.ui.setup.NewGameScreen
 import com.dartrack.ui.stats.PlayerStatsScreen
 import com.dartrack.ui.stats.StatsScreen
@@ -71,6 +72,7 @@ fun AppRoot() {
                 onHistory = { nav.navigate("history") },
                 onStats = { nav.navigate("stats") },
                 onPlayerStats = { nav.navigate("player_stats") },
+                onManagePlayers = { nav.navigate("players") },
             )
         }
         composable(
@@ -152,6 +154,9 @@ fun AppRoot() {
         }
         composable("player_stats") {
             PlayerStatsScreen(onBack = { nav.popBackStack() })
+        }
+        composable("players") {
+            PlayerManagementScreen(onBack = { nav.popBackStack() })
         }
     }
 }
