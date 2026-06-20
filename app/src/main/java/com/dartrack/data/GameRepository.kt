@@ -1,6 +1,15 @@
 package com.dartrack.data
 
 import android.content.Context
+import com.dartrack.model.AroundTheClockState
+import com.dartrack.model.BobsTwentySevenState
+import com.dartrack.model.Catch40State
+import com.dartrack.model.CricketState
+import com.dartrack.model.GamePlayer
+import com.dartrack.model.GameState
+import com.dartrack.model.HalfItState
+import com.dartrack.model.ShanghaiState
+import com.dartrack.model.X01State
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -83,6 +92,24 @@ class GameRepository private constructor(private val file: File) {
             }
         }
 
+    /**
+     * Reassigns every game record's seats from player [fromId] to [intoId],
+     * giving the reassigned seats the canonical [intoName]. Used by player
+     * merge: after this, games that referenced [fromId] reference [intoId].
+     * Runs under the same [mutex] and persists via the existing atomic
+     * [persistLocked] path. Returns how many records changed (0 -> no persist).
+     */
+    suspend fun reassignPlayer(fromId: String, intoId: String, intoName: String): Int =
+        withContext(Dispatchers.IO) {
+            mutex.withLock {
+                val current = _games.value
+                val next = reassignPlayerInRecords(current, fromId, intoId, intoName)
+                val changed = next.count { it.changed }
+                if (changed > 0) persistLocked(next.map { it.record })
+                changed
+            }
+        }
+
     suspend fun delete(id: String) = withContext(Dispatchers.IO) {
         mutex.withLock {
             val list = _games.value.filterNot { it.id == id }
@@ -114,5 +141,56 @@ class GameRepository private constructor(private val file: File) {
                     File(context.applicationContext.filesDir, "games.json")
                 ).also { instance = it }
             }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Pure, Android-free logic for player reassignment (unit-testable).
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns a copy of this state with its [GameState.players] seat list replaced.
+ * The sealed interface exposes `players` read-only, so we dispatch over each
+ * concrete state to use its generated `copy`. Used by player merge to retarget
+ * seats. Only the seat list (`players`) is touched; all per-player gameplay
+ * sub-state (scores etc., keyed positionally) is preserved.
+ */
+fun GameState.withPlayers(players: List<GamePlayer>): GameState = when (this) {
+    is X01State -> copy(players = players)
+    is CricketState -> copy(players = players)
+    is HalfItState -> copy(players = players)
+    is AroundTheClockState -> copy(players = players)
+    is BobsTwentySevenState -> copy(players = players)
+    is ShanghaiState -> copy(players = players)
+    is Catch40State -> copy(players = players)
+}
+
+/** A game record paired with whether [reassignPlayerInRecords] changed it. */
+data class ReassignedRecord(val record: GameRecord, val changed: Boolean)
+
+/**
+ * Pure reassignment: for each record in [records], any seat whose
+ * [GamePlayer.id] equals [fromId] is rewritten to `id = intoId, name = intoName`.
+ * Records with no matching seat are returned unchanged (and flagged
+ * `changed = false`). No-op (all unchanged) when [fromId] == [intoId]. Order is
+ * preserved.
+ */
+fun reassignPlayerInRecords(
+    records: List<GameRecord>,
+    fromId: String,
+    intoId: String,
+    intoName: String,
+): List<ReassignedRecord> {
+    if (fromId == intoId) return records.map { ReassignedRecord(it, changed = false) }
+    return records.map { record ->
+        val seats = record.state.players
+        if (seats.none { it.id == fromId }) {
+            ReassignedRecord(record, changed = false)
+        } else {
+            val newSeats = seats.map { seat ->
+                if (seat.id == fromId) seat.copy(id = intoId, name = intoName) else seat
+            }
+            ReassignedRecord(record.copy(state = record.state.withPlayers(newSeats)), changed = true)
+        }
     }
 }
