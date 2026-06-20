@@ -65,6 +65,18 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+    lint {
+        // The release build runs lintVitalRelease as part of assembleRelease.
+        // The lint bundled with AGP 8.7.2 crashes (IncompatibleClassChangeError /
+        // "Found class KaCallableMemberCall, but interface was expected" in
+        // NonNullableMutableLiveDataDetector) against the newer Kotlin analysis
+        // libraries pulled in by the Compose/material3 (Expressive) upgrade. Skip
+        // lint on the release build so the personal-use APK still assembles; the
+        // build-check CI workflow still compiles every source set and runs all
+        // unit tests, so this does not weaken the build's correctness gate.
+        checkReleaseBuilds = false
+        abortOnError = false
+    }
 }
 
 dependencies {
