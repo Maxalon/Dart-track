@@ -8,7 +8,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.builtins.ListSerializer
 import java.io.File
 
 /**
@@ -21,6 +20,14 @@ class GameRepository private constructor(private val file: File) {
     private val _games = MutableStateFlow<List<GameRecord>>(emptyList())
     val games: StateFlow<List<GameRecord>> = _games.asStateFlow()
 
+    /**
+     * Loads the games store. The store is a versioned envelope ([GameStore]);
+     * see [decodeGameStore] for the WIPE policy. If the on-disk data is legacy
+     * (the old unversioned bare-array of name-only games), corrupt, or from an
+     * older schema, [decodeGameStore] yields an empty list and we OVERWRITE the
+     * file with a fresh, current-version store so the legacy data is gone and
+     * never re-read. Decode never throws, so old data cannot crash us.
+     */
     suspend fun load() = withContext(Dispatchers.IO) {
         mutex.withLock {
             if (!file.exists()) {
@@ -28,16 +35,15 @@ class GameRepository private constructor(private val file: File) {
                 return@withLock
             }
             val text = runCatching { file.readText() }.getOrDefault("")
-            if (text.isBlank()) {
-                _games.value = emptyList()
-                return@withLock
+            val parsed = decodeGameStore(text)
+            // If we read nothing usable but the file held *something*, it was
+            // legacy/incompatible/corrupt -> rewrite a clean current store so
+            // the wipe is durable. Reuses the atomic write path.
+            if (parsed.isEmpty() && text.isNotBlank()) {
+                runCatching { persistLocked(emptyList()) }
+            } else {
+                _games.value = parsed.sortedByDescending { it.updatedAtEpochMs }
             }
-            val parsed = runCatching {
-                GameJson.format.decodeFromString(
-                    ListSerializer(GameRecord.serializer()), text
-                )
-            }.getOrDefault(emptyList())
-            _games.value = parsed.sortedByDescending { it.updatedAtEpochMs }
         }
     }
 
@@ -91,11 +97,7 @@ class GameRepository private constructor(private val file: File) {
     private fun persistLocked(list: List<GameRecord>) {
         file.parentFile?.mkdirs()
         val tmp = File(file.parentFile, file.name + ".tmp")
-        tmp.writeText(
-            GameJson.format.encodeToString(
-                ListSerializer(GameRecord.serializer()), list
-            )
-        )
+        tmp.writeText(encodeGameStore(list))
         if (!tmp.renameTo(file)) {
             // Fallback: overwrite
             file.writeText(tmp.readText())
