@@ -1,19 +1,16 @@
 package com.dartrack.ui.game
 
 import androidx.compose.animation.core.animateIntAsState
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material.icons.filled.VolumeUp
@@ -36,10 +33,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -99,8 +94,8 @@ fun X01GameScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(8.dp),
+            .statusBarsPadding()
+            .padding(horizontal = 8.dp),
     ) {
         // ---- Top bar: mode summary, caller toggle, exit. ------------------
         Row(
@@ -135,110 +130,114 @@ fun X01GameScreen(
             LegScoreboard(state)
         }
 
-        // ---- HERO: the current player's remaining score, dominant. -------
-        if (!state.isFinished) {
-            HeroRemaining(state)
-        }
+        // ---- Players area: absorbs spare vertical space so we never scroll.
+        // The active thrower's own row IS the hero (big remaining number); the
+        // others stay as compact one-line rows. No separate hero card.
+        Column(modifier = Modifier.weight(1f)) {
+            state.players.forEachIndexed { idx, p ->
+                val ps = state.perPlayer[idx]
+                val active = idx == state.currentPlayerIndex && !state.isFinished
+                val isWinner = state.winnerIndices.contains(idx)
 
-        // ---- Per-player cards: bold accent for the active thrower. --------
-        state.players.forEachIndexed { idx, p ->
-            val ps = state.perPlayer[idx]
-            val active = idx == state.currentPlayerIndex && !state.isFinished
-            val isWinner = state.winnerIndices.contains(idx)
+                val containerColor = when {
+                    isWinner -> MaterialTheme.colorScheme.secondary
+                    active -> MaterialTheme.colorScheme.primaryContainer
+                    else -> MaterialTheme.colorScheme.surfaceVariant
+                }
+                val contentColor = when {
+                    isWinner -> MaterialTheme.colorScheme.onSecondary
+                    active -> MaterialTheme.colorScheme.onPrimaryContainer
+                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                }
 
-            val containerColor = when {
-                isWinner -> MaterialTheme.colorScheme.secondary
-                active -> MaterialTheme.colorScheme.primaryContainer
-                else -> MaterialTheme.colorScheme.surfaceVariant
-            }
-            val contentColor = when {
-                isWinner -> MaterialTheme.colorScheme.onSecondary
-                active -> MaterialTheme.colorScheme.onPrimaryContainer
-                else -> MaterialTheme.colorScheme.onSurfaceVariant
-            }
+                val nameSuffix = (when {
+                    state.setsToWin > 1 ->
+                        "  (${state.setsWonBy(idx)} sets · ${state.legsWonBy(idx)} legs)"
+                    state.isMatch -> "  (${state.legsWonBy(idx)} legs)"
+                    else -> ""
+                }) + (if (isWinner) "  🏆" else "")
 
-            ElevatedCard(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
-                colors = CardDefaults.elevatedCardColors(
-                    containerColor = containerColor,
-                    contentColor = contentColor,
-                ),
-                elevation = CardDefaults.elevatedCardElevation(
-                    defaultElevation = if (active || isWinner) 8.dp else 1.dp,
-                ),
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                ElevatedCard(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+                    colors = CardDefaults.elevatedCardColors(
+                        containerColor = containerColor,
+                        contentColor = contentColor,
+                    ),
+                    elevation = CardDefaults.elevatedCardElevation(
+                        defaultElevation = if (active || isWinner) 8.dp else 1.dp,
+                    ),
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            p.name +
-                                (when {
-                                    state.setsToWin > 1 ->
-                                        "  (${state.setsWonBy(idx)} sets · ${state.legsWonBy(idx)} legs)"
-                                    state.isMatch -> "  (${state.legsWonBy(idx)} legs)"
-                                    else -> ""
-                                }) +
-                                (if (isWinner) "  🏆" else ""),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = if (active) FontWeight.Bold else FontWeight.SemiBold,
+                    if (active) {
+                        // Expanded "hero" row for the active thrower.
+                        val animated by animateIntAsState(
+                            targetValue = state.scoreFor(idx),
+                            label = "x01HeroRemaining",
                         )
-                        Spacer(Modifier.height(2.dp))
-                        Text(
-                            "avg ${"%.1f".format(X01Stats.threeDartAverage(ps, state.startScore))}" +
-                                " · darts ${ps.turns.size * 3}" +
-                                (X01Stats.highestTurn(ps).takeIf { it > 0 }?.let { " · best $it" } ?: ""),
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                        ps.turns.lastOrNull()?.let { last ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    p.name + nameSuffix,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                )
+                                Text(
+                                    "to throw",
+                                    style = MaterialTheme.typography.labelLarge,
+                                )
+                                Text(
+                                    "avg ${"%.1f".format(X01Stats.threeDartAverage(ps, state.startScore))}" +
+                                        " · darts ${ps.turns.size * 3}" +
+                                        (X01Stats.highestTurn(ps).takeIf { it > 0 }
+                                            ?.let { " · best $it" } ?: ""),
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                            }
                             Text(
-                                "last " + if (last.bust) "BUST" else last.entered.toString(),
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Medium,
+                                animated.toString(),
+                                fontSize = 72.sp,
+                                fontWeight = FontWeight.Black,
+                            )
+                        }
+                    } else {
+                        // Compact one-line row for inactive players.
+                        Row(
+                            modifier = Modifier.fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    p.name + nameSuffix,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                                ps.turns.lastOrNull()?.let { last ->
+                                    Text(
+                                        "last " + if (last.bust) "BUST" else last.entered.toString(),
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Medium,
+                                    )
+                                }
+                            }
+                            Text(
+                                state.scoreFor(idx).toString(),
+                                fontSize = 34.sp,
+                                fontWeight = FontWeight.Bold,
                             )
                         }
                     }
-                    Text(
-                        state.scoreFor(idx).toString(),
-                        fontSize = if (active) 44.sp else 34.sp,
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
-                val recentTurns = ps.turns.takeLast(3)
-                if (recentTurns.isNotEmpty()) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        recentTurns.forEach { t ->
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(
-                                        if (t.bust) MaterialTheme.colorScheme.errorContainer
-                                        else MaterialTheme.colorScheme.surface
-                                    )
-                                    .padding(horizontal = 10.dp, vertical = 4.dp),
-                            ) {
-                                Text(
-                                    if (t.bust) "BUST" else t.entered.toString(),
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = if (t.bust) MaterialTheme.colorScheme.onErrorContainer
-                                            else MaterialTheme.colorScheme.onSurface,
-                                )
-                            }
-                        }
-                    }
                 }
             }
         }
 
-        Spacer(Modifier.height(8.dp))
-
+        // ---- Compact mid strip (checkout chip) + bottom controls. --------
         if (state.isFinished) {
             ElevatedCard(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
-                Column(modifier = Modifier.padding(20.dp)) {
+                Column(modifier = Modifier.padding(16.dp)) {
                     Text(
                         (if (state.isMatch) "Match winner: " else "Winner: ") +
                             state.winnerIndices.joinToString { state.players[it].name } +
@@ -255,8 +254,10 @@ fun X01GameScreen(
                         fontWeight = FontWeight.Bold,
                     )
                     Spacer(Modifier.height(8.dp))
-                    TextButton(onClick = onExit) { Text("Back to home") }
-                    TextButton(onClick = { vm.undoX01() }) { Text("Undo last turn") }
+                    Row {
+                        TextButton(onClick = onExit) { Text("Back to home") }
+                        TextButton(onClick = { vm.undoX01() }) { Text("Undo last turn") }
+                    }
                 }
             }
         } else {
@@ -265,21 +266,24 @@ fun X01GameScreen(
             if (routes.isNotEmpty()) {
                 CheckoutChip(routes)
             }
-            ScoreNumpad(
-                entry = entry,
-                onEntryChange = { entry = it },
-                onConfirm = { v ->
-                    val before = state.currentPlayerScore()
-                    val wouldFinish = (before - v) == 0
-                    if (state.doubleOut && wouldFinish) {
-                        pendingFinish = v
-                    } else {
-                        confirmTurn(v, finishedOnDouble = !state.doubleOut)
-                    }
-                },
-                onUndo = { vm.undoX01(); entry = "" },
-                maxValue = 180,
-            )
+            // ---- Bottom controls: numpad, kept clear of the nav bar. ------
+            Column(modifier = Modifier.navigationBarsPadding()) {
+                ScoreNumpad(
+                    entry = entry,
+                    onEntryChange = { entry = it },
+                    onConfirm = { v ->
+                        val before = state.currentPlayerScore()
+                        val wouldFinish = (before - v) == 0
+                        if (state.doubleOut && wouldFinish) {
+                            pendingFinish = v
+                        } else {
+                            confirmTurn(v, finishedOnDouble = !state.doubleOut)
+                        }
+                    },
+                    onUndo = { vm.undoX01(); entry = "" },
+                    maxValue = 180,
+                )
+            }
         }
     }
 
@@ -303,50 +307,6 @@ fun X01GameScreen(
                 }) { Text("No — bust") }
             },
         )
-    }
-}
-
-/**
- * Hero panel: the active player's remaining score as the dominant element on the
- * screen, animated so it counts to its new value after each turn. Readable across
- * a room off a wall/stand.
- */
-@Composable
-private fun HeroRemaining(state: X01State) {
-    val target = state.currentPlayerScore()
-    val animated by animateIntAsState(targetValue = target, label = "heroRemaining")
-    val activeName = state.players.getOrNull(state.currentPlayerIndex)?.name ?: ""
-
-    Surface(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
-        shape = MaterialTheme.shapes.extraLarge,
-        color = MaterialTheme.colorScheme.primary,
-        contentColor = MaterialTheme.colorScheme.onPrimary,
-        tonalElevation = 6.dp,
-        shadowElevation = 6.dp,
-    ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 18.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Text(
-                "$activeName to throw",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                textAlign = TextAlign.Center,
-            )
-            Text(
-                animated.toString(),
-                fontSize = 96.sp,
-                fontWeight = FontWeight.Black,
-                textAlign = TextAlign.Center,
-            )
-            Text(
-                "remaining",
-                style = MaterialTheme.typography.labelLarge,
-                textAlign = TextAlign.Center,
-            )
-        }
     }
 }
 

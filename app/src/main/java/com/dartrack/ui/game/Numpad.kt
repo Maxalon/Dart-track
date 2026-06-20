@@ -55,22 +55,23 @@ fun ScoreNumpad(
     val displayed = if (entry.isBlank()) "0" else entry
     val invalid = parsed == null || parsed > maxValue
 
-    // Large, glanceable targets sized for arm's-length use on an 8.dp rhythm.
-    val keyHeight = 68.dp
-    val actionHeight = 64.dp
-    val rowSpacing = 8.dp
+    // Compact but comfortably tappable targets on a 6.dp rhythm so the whole
+    // game screen fits common phone heights without scrolling.
+    val keyHeight = 54.dp
+    val actionHeight = 54.dp
+    val rowSpacing = 6.dp
 
-    Column(modifier = modifier.fillMaxWidth().padding(8.dp)) {
-        // Pending value display: kept prominent and centered.
+    Column(modifier = modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)) {
+        // Pending value display: kept prominent and centered, but compact.
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(72.dp),
+                .height(48.dp),
             contentAlignment = Alignment.Center,
         ) {
             Text(
                 text = displayed,
-                style = MaterialTheme.typography.displayMedium,
+                style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
                 color = if (invalid) MaterialTheme.colorScheme.error
                         else MaterialTheme.colorScheme.onBackground,
@@ -139,9 +140,8 @@ fun ScoreNumpad(
                 Icon(Icons.Default.Backspace, contentDescription = "Backspace")
             }
         }
-        Spacer(Modifier.height(rowSpacing))
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().padding(top = rowSpacing / 2),
             horizontalArrangement = Arrangement.spacedBy(rowSpacing),
         ) {
             if (onUndo != null) {
