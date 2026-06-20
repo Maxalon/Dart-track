@@ -1,5 +1,8 @@
 package com.dartrack.ui.history
 
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -22,6 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -30,7 +35,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dartrack.data.GameRepository
 import com.dartrack.data.HistoryExport
+import com.dartrack.data.HistoryImport
 import com.dartrack.model.GameMode
+import kotlinx.coroutines.launch
 import java.text.DateFormat
 import java.util.Date
 
@@ -44,6 +51,37 @@ fun HistoryScreen(
     val repo = remember { GameRepository.get(context) }
     val games by repo.games.collectAsState()
     val df = remember { DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT) }
+    val scope = rememberCoroutineScope()
+
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            val result = runCatching {
+                val text = context.contentResolver.openInputStream(uri)?.use { stream ->
+                    stream.bufferedReader().readText()
+                } ?: error("Could not open file.")
+                HistoryImport.importInto(repo, text)
+            }
+            result.fold(
+                onSuccess = { r ->
+                    Toast.makeText(
+                        context,
+                        "Imported ${r.imported} games (${r.skipped} duplicates skipped)",
+                        Toast.LENGTH_LONG,
+                    ).show()
+                },
+                onFailure = {
+                    Toast.makeText(
+                        context,
+                        "Import failed: not a valid history file.",
+                        Toast.LENGTH_LONG,
+                    ).show()
+                },
+            )
+        }
+    }
 
     Column(modifier = Modifier.fillMaxSize().padding(8.dp)) {
         Row(
@@ -52,6 +90,15 @@ fun HistoryScreen(
         ) {
             Text("History", fontSize = 22.sp, fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f))
+            IconButton(
+                onClick = {
+                    // OpenDocument takes an array of MIME types; allow JSON with
+                    // a wildcard fallback for pickers/providers that mislabel it.
+                    importLauncher.launch(arrayOf("application/json", "*/*"))
+                },
+            ) {
+                Icon(Icons.Default.FileDownload, contentDescription = "Import history")
+            }
             IconButton(
                 onClick = { HistoryExport.shareHistory(context, games) },
                 enabled = games.isNotEmpty(),
