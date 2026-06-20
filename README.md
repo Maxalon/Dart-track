@@ -59,11 +59,12 @@ per-player statistics. Fully offline, no ads, no accounts.
 - Modern **Material 3** design system: a complete dartboard-red light/dark
   color scheme (with **Material You** dynamic color on Android 12+), custom
   typography, and shape tokens.
-- **Glanceable scoreboard** (X01): a hero remaining-score card with a
-  count-up animation, a bold current-player indicator, and a prominent
+- **Glanceable scoreboards**: every game mode (X01, Cricket, Half-It, Around
+  the Clock) shares a consistent modern layout — a hero score/target with a
+  count-up animation, a bold current-player indicator, and (X01) a prominent
   checkout-suggestion chip — built for reading at arm's length off a stand.
-- **Large, tactile score entry**: big keypad targets with haptic feedback on
-  taps, confirm, bust, and game shot.
+- **Large, clear score entry**: big keypad touch targets for fast, low-error
+  input.
 - **Animated navigation**: slide + fade transitions between screens (New Game
   enters as a slide-up modal).
 
