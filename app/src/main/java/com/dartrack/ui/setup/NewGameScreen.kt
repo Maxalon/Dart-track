@@ -75,6 +75,7 @@ fun NewGameScreen(
     var doubleOut by remember { mutableStateOf(true) }
     var legsToWin by remember { mutableStateOf(1) }
     var setsToWin by remember { mutableStateOf(1) }
+    var cutThroat by remember { mutableStateOf(false) }
     // One nullable selected Player per seat; start with two empty seats.
     val seats = remember { mutableStateListOf<Player?>(null, null) }
 
@@ -158,6 +159,21 @@ fun NewGameScreen(
             }
         }
 
+        if (mode == GameMode.CRICKET) {
+            Spacer(Modifier.height(16.dp))
+            Text("Variant", fontWeight = FontWeight.SemiBold)
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                FilterChip(
+                    selected = cutThroat,
+                    onClick = { cutThroat = !cutThroat },
+                    label = { Text("Cut-throat") },
+                )
+            }
+        }
+
         Spacer(Modifier.height(16.dp))
         Text("Players (${seats.size})", fontWeight = FontWeight.SemiBold)
         seats.forEachIndexed { idx, selected ->
@@ -207,7 +223,7 @@ fun NewGameScreen(
                         .map { GamePlayer(name = it.name, id = it.id) }
                     val state = when (mode) {
                         GameMode.X01 -> X01State.new(gamePlayers, startScore, doubleOut, legsToWin, setsToWin)
-                        GameMode.CRICKET -> CricketState.new(gamePlayers)
+                        GameMode.CRICKET -> CricketState.new(gamePlayers, cutThroat)
                         GameMode.HALF_IT -> HalfItState.new(gamePlayers)
                         GameMode.AROUND_CLOCK -> AroundTheClockState.new(gamePlayers)
                         GameMode.BOBS_27 -> BobsTwentySevenState.new(gamePlayers)
