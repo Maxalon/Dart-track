@@ -64,6 +64,11 @@ fun CountUpScreen(
 
     var entry by remember { mutableStateOf("") }
 
+    // The active seat may be a CPU opponent; the viewmodel auto-plays its turn,
+    // so we hide the numpad and show a "throwing" indicator instead of input.
+    val isBotTurn = !state.isFinished &&
+        state.players.getOrNull(state.currentPlayerIndex)?.isBot == true
+
     val caller = rememberCaller()
     var callerOn by rememberSaveable { mutableStateOf(false) }
 
@@ -229,6 +234,10 @@ fun CountUpScreen(
                         modifier = Modifier.weight(1f).height(56.dp),
                     ) { Text("Home") }
                 }
+            } else if (isBotTurn) {
+                // CPU seat: the viewmodel is taking the turn — no input. Undo is
+                // still offered (undoing a bot turn is fine).
+                BotThrowingIndicator(onUndo = { vm.undoCountUp(); entry = "" })
             } else {
                 ScoreNumpad(
                     entry = entry,

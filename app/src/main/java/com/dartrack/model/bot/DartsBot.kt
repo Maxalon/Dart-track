@@ -1,6 +1,7 @@
 package com.dartrack.model.bot
 
 import com.dartrack.model.Checkout
+import kotlinx.serialization.Serializable
 import kotlin.random.Random
 
 /**
@@ -16,6 +17,7 @@ import kotlin.random.Random
  * simulator is calibrated so that, over many [DartsBot] scoring visits, the
  * empirical mean lands on this number (see [DartsBot.expectedThreeDartAverage]).
  */
+@Serializable
 enum class BotLevel(val label: String, val threeDartAverage: Int) {
     EASY("Easy", 40),
     MEDIUM("Medium", 60),

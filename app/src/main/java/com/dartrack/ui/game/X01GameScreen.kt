@@ -61,6 +61,11 @@ fun X01GameScreen(
     var entry by remember { mutableStateOf("") }
     var pendingFinish by remember { mutableStateOf<Int?>(null) }
 
+    // The active seat may be a CPU opponent; the viewmodel auto-plays its turn,
+    // so we hide the numpad and show a "throwing" indicator instead of input.
+    val isBotTurn = !state.isFinished &&
+        state.players.getOrNull(state.currentPlayerIndex)?.isBot == true
+
     val caller = rememberCaller()
     var callerOn by rememberSaveable { mutableStateOf(false) }
 
@@ -270,21 +275,27 @@ fun X01GameScreen(
             }
             // ---- Bottom controls: numpad, kept clear of the nav bar. ------
             Column(modifier = Modifier.navigationBarsPadding()) {
-                ScoreNumpad(
-                    entry = entry,
-                    onEntryChange = { entry = it },
-                    onConfirm = { v ->
-                        val before = state.currentPlayerScore()
-                        val wouldFinish = (before - v) == 0
-                        if (state.doubleOut && wouldFinish) {
-                            pendingFinish = v
-                        } else {
-                            confirmTurn(v, finishedOnDouble = !state.doubleOut)
-                        }
-                    },
-                    onUndo = { vm.undoX01(); entry = "" },
-                    maxValue = 180,
-                )
+                if (isBotTurn) {
+                    // CPU seat: the viewmodel is taking the turn — no input. Undo
+                    // is still offered (undoing a bot turn is fine).
+                    BotThrowingIndicator(onUndo = { vm.undoX01(); entry = "" })
+                } else {
+                    ScoreNumpad(
+                        entry = entry,
+                        onEntryChange = { entry = it },
+                        onConfirm = { v ->
+                            val before = state.currentPlayerScore()
+                            val wouldFinish = (before - v) == 0
+                            if (state.doubleOut && wouldFinish) {
+                                pendingFinish = v
+                            } else {
+                                confirmTurn(v, finishedOnDouble = !state.doubleOut)
+                            }
+                        },
+                        onUndo = { vm.undoX01(); entry = "" },
+                        maxValue = 180,
+                    )
+                }
             }
         }
     }

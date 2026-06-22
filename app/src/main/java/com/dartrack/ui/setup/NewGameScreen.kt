@@ -55,8 +55,21 @@ import com.dartrack.model.HalfItState
 import com.dartrack.model.Player
 import com.dartrack.model.ShanghaiState
 import com.dartrack.model.X01State
+import com.dartrack.model.bot.BotLevel
 import kotlinx.coroutines.launch
 import java.util.UUID
+
+/**
+ * What a single seat is filled with on the setup screen. A seat is either a
+ * registered [Human] player (possibly not yet chosen, hence the nullable
+ * [Player]) or a [Cpu] opponent at a fixed [BotLevel]. CPU seats are only
+ * offered for X01 / Count-Up (see [NewGameScreen]); for every other mode the
+ * seat list only ever holds [Human]s.
+ */
+private sealed interface SeatChoice {
+    data class Human(val player: Player?) : SeatChoice
+    data class Cpu(val level: BotLevel) : SeatChoice
+}
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -78,8 +91,23 @@ fun NewGameScreen(
     var legsToWin by remember { mutableStateOf(1) }
     var setsToWin by remember { mutableStateOf(1) }
     var cutThroat by remember { mutableStateOf(false) }
-    // One nullable selected Player per seat; start with two empty seats.
-    val seats = remember { mutableStateListOf<Player?>(null, null) }
+    // One choice per seat; start with two empty human seats.
+    val seats = remember {
+        mutableStateListOf<SeatChoice>(SeatChoice.Human(null), SeatChoice.Human(null))
+    }
+    // CPU seats only make sense for the two solo-friendly scoring modes.
+    val botsAllowed = mode == GameMode.X01 || mode == GameMode.COUNT_UP
+
+    // Switching to a mode that doesn't support CPU opponents must not silently
+    // carry bot seats over: revert any CPU seat back to an empty human seat so
+    // those modes behave exactly as before this feature.
+    LaunchedEffect(botsAllowed) {
+        if (!botsAllowed) {
+            seats.forEachIndexed { i, s ->
+                if (s is SeatChoice.Cpu) seats[i] = SeatChoice.Human(null)
+            }
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -180,51 +208,100 @@ fun NewGameScreen(
 
         Spacer(Modifier.height(16.dp))
         Text("Players (${seats.size})", fontWeight = FontWeight.SemiBold)
-        seats.forEachIndexed { idx, selected ->
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                SeatPicker(
-                    label = "Player ${idx + 1}",
-                    selected = selected,
-                    allPlayers = players,
-                    // Exclude players already chosen in OTHER seats.
-                    takenIds = seats.filterIndexed { i, p -> i != idx && p != null }
-                        .mapNotNull { it?.id }
-                        .toSet(),
-                    onSelect = { seats[idx] = it },
-                    onCreate = { query ->
-                        scope.launch {
-                            val created = playerRepo.addPlayer(query)
-                            seats[idx] = created
+        // Ids already taken by registered-player (human) seats — used to stop the
+        // same player being picked twice. CPU seats have no registry id.
+        val takenIds = seats.filterIsInstance<SeatChoice.Human>()
+            .mapNotNull { it.player?.id }
+            .toSet()
+        seats.forEachIndexed { idx, seat ->
+            Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    when (seat) {
+                        is SeatChoice.Human -> SeatPicker(
+                            label = "Player ${idx + 1}",
+                            selected = seat.player,
+                            allPlayers = players,
+                            // Exclude players already chosen in OTHER human seats.
+                            takenIds = takenIds - (seat.player?.id?.let { setOf(it) } ?: emptySet()),
+                            onSelect = { seats[idx] = SeatChoice.Human(it) },
+                            onCreate = { query ->
+                                scope.launch {
+                                    val created = playerRepo.addPlayer(query)
+                                    seats[idx] = SeatChoice.Human(created)
+                                }
+                            },
+                            modifier = Modifier.weight(1f),
+                        )
+                        is SeatChoice.Cpu -> Text(
+                            "Player ${idx + 1}: CPU",
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    if (seats.size > 1) {
+                        Spacer(Modifier.height(0.dp))
+                        TextButton(onClick = { seats.removeAt(idx) }) { Text("Remove") }
+                    }
+                }
+                // CPU controls — only offered for X01 / Count-Up. Toggling here
+                // swaps the seat between a registered player and a CPU; for a CPU
+                // seat the level chips pick its difficulty.
+                if (botsAllowed) {
+                    FlowRow(
+                        modifier = Modifier.padding(top = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        FilterChip(
+                            selected = seat is SeatChoice.Human,
+                            onClick = { seats[idx] = SeatChoice.Human(null) },
+                            label = { Text("Player") },
+                        )
+                        BotLevel.entries.forEach { level ->
+                            FilterChip(
+                                selected = seat is SeatChoice.Cpu && seat.level == level,
+                                onClick = { seats[idx] = SeatChoice.Cpu(level) },
+                                label = { Text("CPU ${level.label}") },
+                            )
                         }
-                    },
-                    modifier = Modifier.weight(1f),
-                )
-                if (seats.size > 1) {
-                    Spacer(Modifier.height(0.dp))
-                    TextButton(onClick = { seats.removeAt(idx) }) { Text("Remove") }
+                    }
                 }
             }
         }
         if (seats.size < 4) {
             OutlinedButton(
-                onClick = { seats.add(null) },
+                onClick = { seats.add(SeatChoice.Human(null)) },
             ) { Text("Add player") }
         }
 
         Spacer(Modifier.height(24.dp))
-        val selectedPlayers = seats.filterNotNull()
-        val allSeatsFilled = selectedPlayers.size == seats.size
-        val distinct = selectedPlayers.map { it.id }.toSet().size == selectedPlayers.size
-        val canStart = seats.isNotEmpty() && allSeatsFilled && distinct
+        // A human seat counts as "filled" only once a player is chosen; a CPU
+        // seat is always filled. We additionally require at least one human.
+        val humanSeats = seats.filterIsInstance<SeatChoice.Human>()
+        val chosenHumans = humanSeats.mapNotNull { it.player }
+        val allSeatsFilled = humanSeats.all { it.player != null }
+        val distinctHumans = chosenHumans.map { it.id }.toSet().size == chosenHumans.size
+        val hasHuman = chosenHumans.isNotEmpty()
+        val canStart = seats.isNotEmpty() && allSeatsFilled && distinctHumans && hasHuman
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = onCancel) { Text("Cancel") }
             Button(
                 onClick = {
-                    val gamePlayers = seats.filterNotNull()
-                        .map { GamePlayer(name = it.name, id = it.id) }
+                    val gamePlayers = seats.map { seat ->
+                        when (seat) {
+                            is SeatChoice.Human -> {
+                                // canStart guarantees every human seat has a player.
+                                val p = seat.player!!
+                                GamePlayer(name = p.name, id = p.id)
+                            }
+                            is SeatChoice.Cpu -> GamePlayer(
+                                name = "CPU · ${seat.level.label}",
+                                id = "bot:" + UUID.randomUUID().toString(),
+                                isBot = true,
+                                botLevel = seat.level,
+                            )
+                        }
+                    }
                     val state = when (mode) {
                         GameMode.X01 -> X01State.new(gamePlayers, startScore, doubleOut, legsToWin, setsToWin)
                         GameMode.CRICKET -> CricketState.new(gamePlayers, cutThroat)
@@ -256,8 +333,11 @@ fun NewGameScreen(
         if (!canStart) {
             Spacer(Modifier.height(8.dp))
             Text(
-                if (!allSeatsFilled) "Pick a registered player for every seat."
-                else "Each seat must be a different player.",
+                when {
+                    !allSeatsFilled -> "Pick a registered player for every non-CPU seat."
+                    !hasHuman -> "Add at least one human player."
+                    else -> "Each seat must be a different player."
+                },
                 fontSize = 12.sp,
             )
         }
