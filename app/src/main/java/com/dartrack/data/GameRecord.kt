@@ -5,6 +5,7 @@ import com.dartrack.model.GameState
 import com.dartrack.model.AroundTheClockState
 import com.dartrack.model.BobsTwentySevenState
 import com.dartrack.model.Catch40State
+import com.dartrack.model.CountUpState
 import com.dartrack.model.CricketState
 import com.dartrack.model.HalfItState
 import com.dartrack.model.ShanghaiState
@@ -97,4 +98,5 @@ fun GameState.toMode(): GameMode = when (this) {
     is BobsTwentySevenState -> GameMode.BOBS_27
     is ShanghaiState -> GameMode.SHANGHAI
     is Catch40State -> GameMode.CATCH_40
+    is CountUpState -> GameMode.COUNT_UP
 }
