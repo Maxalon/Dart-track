@@ -384,6 +384,17 @@ private fun ModeSummariesCard(s: PlayerStatsData) {
         if (s.checkoutTrainer.gamesPlayed > 0) {
             add("Checkout Trainer" to "${s.checkoutTrainer.gamesPlayed} games · wins ${s.checkoutTrainer.gamesWon} · best ${s.checkoutTrainer.best} hits")
         }
+        if (s.baseball.gamesPlayed > 0) {
+            add("Baseball" to "${s.baseball.gamesPlayed} games · wins ${s.baseball.gamesWon} · high ${s.baseball.best}")
+        }
+        if (s.golf.gamesPlayed > 0) {
+            // Golf is lowest-strokes; 0 means no completed result yet.
+            val best = if (s.golf.best > 0) "${s.golf.best} strokes" else "—"
+            add("Golf" to "${s.golf.gamesPlayed} games · wins ${s.golf.gamesWon} · best $best")
+        }
+        if (s.gotcha.gamesPlayed > 0) {
+            add("Gotcha" to "${s.gotcha.gamesPlayed} games · wins ${s.gotcha.gamesWon}")
+        }
     }
     if (rows.isEmpty()) return
     StatsCard("Other modes") {

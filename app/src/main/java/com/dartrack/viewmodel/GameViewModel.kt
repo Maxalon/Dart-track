@@ -9,11 +9,15 @@ import com.dartrack.model.Checkout
 import com.dartrack.model.GamePlayer
 import com.dartrack.model.GameState
 import com.dartrack.model.AroundTheClockState
+import com.dartrack.model.BaseballState
 import com.dartrack.model.BobsTwentySevenState
 import com.dartrack.model.Catch40State
 import com.dartrack.model.CountUpState
 import com.dartrack.model.CheckoutTrainerState
 import com.dartrack.model.CricketState
+import com.dartrack.model.GolfResult
+import com.dartrack.model.GolfState
+import com.dartrack.model.GotchaState
 import com.dartrack.model.HalfItState
 import com.dartrack.model.ShanghaiState
 import com.dartrack.model.X01State
@@ -193,6 +197,21 @@ class GameViewModel(
         mutate { (it as CheckoutTrainerState).applyAttempt(hit, darts) }
 
     fun undoCheckout() = mutate { (it as CheckoutTrainerState).undoLast() }
+
+    fun applyBaseballTurn(singles: Int, doubles: Int, triples: Int) =
+        mutate { (it as BaseballState).applyTurn(singles, doubles, triples) }
+
+    fun undoBaseball() = mutate { (it as BaseballState).undoLast() }
+
+    fun applyGolfResult(result: GolfResult) =
+        mutate { (it as GolfState).applyResult(result) }
+
+    fun undoGolf() = mutate { (it as GolfState).undoLast() }
+
+    fun applyGotchaTurn(total: Int) =
+        mutate { (it as GotchaState).applyTurn(total) }
+
+    fun undoGotcha() = mutate { (it as GotchaState).undoLast() }
 
     class Factory(
         private val repo: GameRepository,

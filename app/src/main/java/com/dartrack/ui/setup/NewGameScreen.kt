@@ -46,11 +46,14 @@ import com.dartrack.data.PlayerRepository
 import com.dartrack.model.GameMode
 import com.dartrack.model.GamePlayer
 import com.dartrack.model.AroundTheClockState
+import com.dartrack.model.BaseballState
 import com.dartrack.model.BobsTwentySevenState
 import com.dartrack.model.Catch40State
 import com.dartrack.model.CountUpState
 import com.dartrack.model.CheckoutTrainerState
 import com.dartrack.model.CricketState
+import com.dartrack.model.GolfState
+import com.dartrack.model.GotchaState
 import com.dartrack.model.HalfItState
 import com.dartrack.model.Player
 import com.dartrack.model.ShanghaiState
@@ -138,6 +141,9 @@ fun NewGameScreen(
                         GameMode.CATCH_40 -> "Catch 40"
                         GameMode.COUNT_UP -> "Count-Up"
                         GameMode.CHECKOUT_TRAINER -> "Checkout Trainer"
+                        GameMode.BASEBALL -> "Baseball"
+                        GameMode.GOLF -> "Golf"
+                        GameMode.GOTCHA -> "Gotcha"
                     }) },
                 )
             }
@@ -312,6 +318,9 @@ fun NewGameScreen(
                         GameMode.CATCH_40 -> Catch40State.new(gamePlayers)
                         GameMode.COUNT_UP -> CountUpState.new(gamePlayers)
                         GameMode.CHECKOUT_TRAINER -> CheckoutTrainerState.new(gamePlayers)
+                        GameMode.BASEBALL -> BaseballState.new(gamePlayers)
+                        GameMode.GOLF -> GolfState.new(gamePlayers)
+                        GameMode.GOTCHA -> GotchaState.new(gamePlayers)
                     }
                     val now = System.currentTimeMillis()
                     val record = GameRecord(

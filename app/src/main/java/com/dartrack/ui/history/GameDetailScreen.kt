@@ -34,6 +34,8 @@ import com.dartrack.data.SettingsRepository
 import com.dartrack.model.GameMode
 import com.dartrack.model.AROUND_CLOCK_LAST_TARGET
 import com.dartrack.model.AroundTheClockState
+import com.dartrack.model.BASEBALL_INNINGS
+import com.dartrack.model.BaseballState
 import com.dartrack.model.BOBS27_LAST_DOUBLE
 import com.dartrack.model.BobsTwentySevenState
 import com.dartrack.model.Catch40State
@@ -41,6 +43,9 @@ import com.dartrack.model.CountUpState
 import com.dartrack.model.CheckoutTrainerState
 import com.dartrack.model.CRICKET_TARGETS
 import com.dartrack.model.CricketState
+import com.dartrack.model.GOLF_HOLES
+import com.dartrack.model.GolfState
+import com.dartrack.model.GotchaState
 import com.dartrack.model.HalfItState
 import com.dartrack.model.SHANGHAI_ROUNDS
 import com.dartrack.model.ShanghaiState
@@ -105,6 +110,9 @@ fun GameDetailScreen(
                     GameMode.CATCH_40 -> "Catch 40"
                     GameMode.COUNT_UP -> "Count-Up"
                     GameMode.CHECKOUT_TRAINER -> "Checkout Trainer"
+                    GameMode.BASEBALL -> "Baseball"
+                    GameMode.GOLF -> "Golf"
+                    GameMode.GOTCHA -> "Gotcha"
                 }, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                 Text("Started: ${df.format(Date(rec.createdAtEpochMs))}")
                 Text("Updated: ${df.format(Date(rec.updatedAtEpochMs))}")
@@ -124,6 +132,9 @@ fun GameDetailScreen(
             is Catch40State -> Catch40Detail(s)
             is CountUpState -> CountUpDetail(s)
             is CheckoutTrainerState -> CheckoutTrainerDetail(s)
+            is BaseballState -> BaseballDetail(s)
+            is GolfState -> GolfDetail(s)
+            is GotchaState -> GotchaDetail(s)
         }
 
         Spacer(Modifier.height(12.dp))
@@ -371,6 +382,85 @@ private fun CheckoutTrainerDetail(s: CheckoutTrainerState) {
                                 val tgt = s.targets.getOrNull(i) ?: "?"
                                 "$tgt→" + (if (a.hit) "✓${a.darts}" else "✗")
                             }.joinToString(" · "),
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Spacer(Modifier.height(6.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun BaseballDetail(s: BaseballState) {
+    Card(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            s.players.forEachIndexed { idx, p ->
+                val ps = s.perPlayer[idx]
+                Text(
+                    "${p.name}: ${ps.total} · ${ps.darts} darts",
+                    fontWeight = FontWeight.SemiBold,
+                )
+                if (ps.innings.isNotEmpty()) {
+                    Text(
+                        "innings 1–$BASEBALL_INNINGS (s/d/t): " +
+                            ps.innings.joinToString(" · ") {
+                                "${it.singles}/${it.doubles}/${it.triples}"
+                            },
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Spacer(Modifier.height(6.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun GolfDetail(s: GolfState) {
+    Card(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            s.players.forEachIndexed { idx, p ->
+                val ps = s.perPlayer[idx]
+                Text(
+                    "${p.name}: ${ps.strokes} strokes · ${ps.holesPlayed}/$GOLF_HOLES holes",
+                    fontWeight = FontWeight.SemiBold,
+                )
+                if (ps.results.isNotEmpty()) {
+                    Text(
+                        "per hole (strokes): " +
+                            ps.results.joinToString(" · ") { it.strokes.toString() },
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Spacer(Modifier.height(6.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun GotchaDetail(s: GotchaState) {
+    Card(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(
+                "target: ${s.target}",
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(6.dp))
+            s.players.forEachIndexed { idx, p ->
+                val ps = s.perPlayer[idx]
+                Text(
+                    "${p.name}: ${ps.total} · ${ps.darts} darts",
+                    fontWeight = FontWeight.SemiBold,
+                )
+                if (ps.turns.isNotEmpty()) {
+                    Text(
+                        "per turn: " + ps.turns.joinToString(" · ") { it.toString() },
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

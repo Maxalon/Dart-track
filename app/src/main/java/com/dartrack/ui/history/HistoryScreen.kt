@@ -143,6 +143,9 @@ fun HistoryScreen(
                                         GameMode.CATCH_40 -> "Catch 40"
                                         GameMode.COUNT_UP -> "Count-Up"
                                         GameMode.CHECKOUT_TRAINER -> "Checkout Trainer"
+                                        GameMode.BASEBALL -> "Baseball"
+                                        GameMode.GOLF -> "Golf"
+                                        GameMode.GOTCHA -> "Gotcha"
                                     },
                                     fontWeight = FontWeight.SemiBold,
                                     modifier = Modifier.weight(1f),

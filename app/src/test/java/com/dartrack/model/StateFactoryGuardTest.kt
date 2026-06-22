@@ -48,4 +48,19 @@ class StateFactoryGuardTest {
     fun catch40_rejectsEmptyPlayers() {
         assertFailsWith<IllegalArgumentException> { Catch40State.new(emptyList()) }
     }
+
+    @Test
+    fun baseball_rejectsEmptyPlayers() {
+        assertFailsWith<IllegalArgumentException> { BaseballState.new(emptyList()) }
+    }
+
+    @Test
+    fun golf_rejectsEmptyPlayers() {
+        assertFailsWith<IllegalArgumentException> { GolfState.new(emptyList()) }
+    }
+
+    @Test
+    fun gotcha_rejectsEmptyPlayers() {
+        assertFailsWith<IllegalArgumentException> { GotchaState.new(emptyList()) }
+    }
 }
