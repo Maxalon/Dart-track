@@ -155,7 +155,7 @@ fun ScoreNumpad(
                     modifier = Modifier.weight(1f).height(actionHeight),
                     shape = MaterialTheme.shapes.medium,
                 ) {
-                    Icon(Icons.Default.Undo, contentDescription = null)
+                    Icon(Icons.Default.Undo, contentDescription = "Undo last turn")
                     Spacer(Modifier.size(8.dp))
                     Text("Undo", style = MaterialTheme.typography.titleMedium)
                 }
@@ -176,7 +176,7 @@ fun ScoreNumpad(
                     contentColor = MaterialTheme.colorScheme.onPrimary,
                 ),
             ) {
-                Icon(Icons.Default.Check, contentDescription = null)
+                Icon(Icons.Default.Check, contentDescription = "Confirm score")
                 Spacer(Modifier.size(8.dp))
                 Text(
                     "Confirm",
@@ -227,7 +227,7 @@ fun BotThrowingIndicator(
                 modifier = Modifier.fillMaxWidth().height(54.dp),
                 shape = MaterialTheme.shapes.medium,
             ) {
-                Icon(Icons.Default.Undo, contentDescription = null)
+                Icon(Icons.Default.Undo, contentDescription = "Undo last turn")
                 Spacer(Modifier.size(8.dp))
                 Text("Undo", style = MaterialTheme.typography.titleMedium)
             }

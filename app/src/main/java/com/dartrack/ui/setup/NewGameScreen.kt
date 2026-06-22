@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.sp
 import com.dartrack.data.GameRecord
 import com.dartrack.data.GameRepository
 import com.dartrack.data.PlayerRepository
+import com.dartrack.data.SettingsRepository
 import com.dartrack.model.GameMode
 import com.dartrack.model.GamePlayer
 import com.dartrack.model.AroundTheClockState
@@ -83,14 +84,34 @@ fun NewGameScreen(
     val context = LocalContext.current
     val repo = remember { GameRepository.get(context) }
     val playerRepo = remember { PlayerRepository.get(context) }
+    val settingsRepo = remember { SettingsRepository.get(context) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) { playerRepo.load() }
+    LaunchedEffect(Unit) { settingsRepo.load() }
     val players by playerRepo.players.collectAsState()
+    val settings by settingsRepo.settings.collectAsState()
 
     var mode by remember { mutableStateOf(GameMode.X01) }
+    // Seed the X01 selectors from the user's saved defaults. The settings flow
+    // starts at in-memory defaults and is replaced once load() finishes, so we
+    // can't just read it into the initial remember (we'd miss the loaded value).
+    // Instead a one-shot LaunchedEffect applies the defaults exactly once after
+    // settings have loaded — before the user has had a chance to change the
+    // chips — and never fights subsequent user edits. defaultX01StartScore is
+    // guaranteed valid by Settings.sanitized(), but we filter defensively.
     var startScore by remember { mutableStateOf(501) }
     var doubleOut by remember { mutableStateOf(true) }
+    var defaultsApplied by remember { mutableStateOf(false) }
+    LaunchedEffect(settings) {
+        if (!defaultsApplied) {
+            if (settings.defaultX01StartScore in X01State.SUPPORTED_STARTS) {
+                startScore = settings.defaultX01StartScore
+            }
+            doubleOut = settings.defaultDoubleOut
+            defaultsApplied = true
+        }
+    }
     var legsToWin by remember { mutableStateOf(1) }
     var setsToWin by remember { mutableStateOf(1) }
     var cutThroat by remember { mutableStateOf(false) }

@@ -325,7 +325,7 @@ fun CricketGameScreen(
                 onClick = { vm.undoCricket(); pending.clear() },
                 modifier = Modifier.weight(1f).height(54.dp),
             ) {
-                Icon(Icons.Default.Undo, contentDescription = null)
+                Icon(Icons.Default.Undo, contentDescription = "Undo last turn")
                 Spacer(Modifier.size(4.dp))
                 Text("Undo")
             }
@@ -345,7 +345,7 @@ fun CricketGameScreen(
                     containerColor = MaterialTheme.colorScheme.primary,
                 ),
             ) {
-                Icon(Icons.Default.Check, contentDescription = null)
+                Icon(Icons.Default.Check, contentDescription = "Confirm turn")
                 Spacer(Modifier.size(4.dp))
                 Text(
                     "Confirm turn",
