@@ -12,11 +12,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
@@ -51,7 +55,10 @@ import com.dartrack.data.threeDartAvgTrendById
 import com.dartrack.model.Player
 
 @Composable
-fun PlayerStatsScreen(onBack: () -> Unit) {
+fun PlayerStatsScreen(
+    onBack: () -> Unit,
+    onOpenAchievements: (playerId: String) -> Unit = {},
+) {
     val context = LocalContext.current
     val gameRepo = remember { GameRepository.get(context) }
     val playerRepo = remember { PlayerRepository.get(context) }
@@ -76,6 +83,15 @@ fun PlayerStatsScreen(onBack: () -> Unit) {
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f),
             )
+            IconButton(
+                onClick = { selected?.let { onOpenAchievements(it.id) } },
+                enabled = selected != null,
+            ) {
+                Icon(
+                    Icons.Default.EmojiEvents,
+                    contentDescription = "Achievements",
+                )
+            }
             TextButton(onClick = onBack) { Text("Back") }
         }
         Spacer(Modifier.height(4.dp))

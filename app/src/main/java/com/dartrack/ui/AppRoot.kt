@@ -15,6 +15,10 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.dartrack.data.GameRepository
+import com.dartrack.data.PlayerRepository
+import com.dartrack.data.achievementSummary
+import com.dartrack.data.achievementsFor
+import com.dartrack.ui.achievements.AchievementsScreen
 import com.dartrack.ui.game.AroundTheClockScreen
 import com.dartrack.ui.game.BobsTwentySevenScreen
 import com.dartrack.ui.game.Catch40Screen
@@ -153,7 +157,33 @@ fun AppRoot() {
             StatsScreen(onBack = { nav.popBackStack() })
         }
         composable("player_stats") {
-            PlayerStatsScreen(onBack = { nav.popBackStack() })
+            PlayerStatsScreen(
+                onBack = { nav.popBackStack() },
+                onOpenAchievements = { playerId -> nav.navigate("achievements/$playerId") },
+            )
+        }
+        composable("achievements/{playerId}") { backstack ->
+            val playerId = backstack.arguments?.getString("playerId") ?: return@composable
+            // Resolve the display name from the same registry PlayerStatsScreen
+            // uses; fall back to the player's stored seat name in any game (so a
+            // name still shows even if the registry has not loaded), then a
+            // generic label as a last resort.
+            val playerRepo = remember { PlayerRepository.get(context) }
+            LaunchedEffect(Unit) { playerRepo.load() }
+            val players by playerRepo.players.collectAsState()
+            val playerName = players.firstOrNull { it.id == playerId }?.name
+                ?: games.firstNotNullOfOrNull { rec ->
+                    rec.state.players.firstOrNull { it.id == playerId }?.name
+                }
+                ?: "Player"
+            val statuses = remember(games, playerId) { achievementsFor(playerId, games) }
+            val summary = remember(games, playerId) { achievementSummary(playerId, games) }
+            AchievementsScreen(
+                playerName = playerName,
+                statuses = statuses,
+                summary = summary,
+                onBack = { nav.popBackStack() },
+            )
         }
         composable("players") {
             PlayerManagementScreen(onBack = { nav.popBackStack() })
