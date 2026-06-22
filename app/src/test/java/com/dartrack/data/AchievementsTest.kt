@@ -1,13 +1,21 @@
 package com.dartrack.data
 
 import com.dartrack.model.AroundTheClockState
+import com.dartrack.model.BaseballState
+import com.dartrack.model.CheckoutTrainerState
+import com.dartrack.model.CountUpState
+import com.dartrack.model.GOLF_HOLES
 import com.dartrack.model.GameMode
 import com.dartrack.model.GamePlayer
+import com.dartrack.model.GolfResult
+import com.dartrack.model.GolfState
+import com.dartrack.model.GotchaState
 import com.dartrack.model.HalfItState
 import com.dartrack.model.ShanghaiState
 import com.dartrack.model.X01PlayerState
 import com.dartrack.model.X01State
 import com.dartrack.model.X01Turn
+import com.dartrack.model.bot.BotLevel
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
@@ -361,6 +369,293 @@ class AchievementsTest {
         val s = status("all_rounder", games)
         assertEquals(0, s.progress, "no wins -> no distinct modes")
         assertFalse(s.unlocked)
+    }
+
+    // ---- golf_under_par -----------------------------------------------------
+
+    @Test
+    fun golfUnderPar_finishingBelowPar() {
+        // Single seat; play all 9 holes as TRIPLE (1 stroke each) -> 9 strokes,
+        // well under the par of 3 * 9 = 27. The model sets winnerIndices on finish.
+        val player = GamePlayer(name = NAME, id = PID)
+        var state = GolfState.new(listOf(player))
+        repeat(GOLF_HOLES) { state = state.applyResult(GolfResult.TRIPLE) }
+        assertTrue(state.isFinished, "all holes played -> finished")
+        val g = GameRecord("r1", GameMode.GOLF, 11L, 11L, state)
+        val s = status("golf_under_par", listOf(g))
+        assertTrue(s.unlocked, "9 strokes is under par")
+        assertEquals(11L, s.unlockedAtMs, "timestamp from the qualifying game")
+    }
+
+    @Test
+    fun golfUnderPar_lockedWhenOverPar() {
+        // All MISS (5 strokes each) -> 45 strokes, well over par -> locked even
+        // though the game is finished.
+        val player = GamePlayer(name = NAME, id = PID)
+        var state = GolfState.new(listOf(player))
+        repeat(GOLF_HOLES) { state = state.applyResult(GolfResult.MISS) }
+        assertTrue(state.isFinished)
+        val g = GameRecord("r1", GameMode.GOLF, 0L, 0L, state)
+        val s = status("golf_under_par", listOf(g))
+        assertFalse(s.unlocked, "45 strokes is over par")
+        assertNull(s.unlockedAtMs, "locked -> null timestamp")
+    }
+
+    // ---- checkout_perfect ---------------------------------------------------
+
+    @Test
+    fun checkoutPerfect_hittingEveryTarget() {
+        // A short 2-target ladder, both HIT -> hits == targets.size.
+        val player = GamePlayer(name = NAME, id = PID)
+        var state = CheckoutTrainerState.new(listOf(player), targets = listOf(40, 60))
+        state = state.applyAttempt(hit = true, darts = 2)
+        state = state.applyAttempt(hit = true, darts = 3)
+        assertTrue(state.isFinished, "both targets attempted -> finished")
+        val g = GameRecord("r1", GameMode.CHECKOUT_TRAINER, 9L, 9L, state)
+        val s = status("checkout_perfect", listOf(g))
+        assertTrue(s.unlocked, "hit every target")
+        assertEquals(9L, s.unlockedAtMs)
+    }
+
+    @Test
+    fun checkoutPerfect_lockedWhenOneTargetMissed() {
+        // First HIT, second MISS -> hits (1) < targets.size (2) -> locked.
+        val player = GamePlayer(name = NAME, id = PID)
+        var state = CheckoutTrainerState.new(listOf(player), targets = listOf(40, 60))
+        state = state.applyAttempt(hit = true, darts = 2)
+        state = state.applyAttempt(hit = false, darts = 0)
+        assertTrue(state.isFinished)
+        val g = GameRecord("r1", GameMode.CHECKOUT_TRAINER, 0L, 0L, state)
+        assertFalse(status("checkout_perfect", listOf(g)).unlocked, "one miss breaks perfection")
+    }
+
+    // ---- baseball_slugger ---------------------------------------------------
+
+    @Test
+    fun baseballSlugger_reachingThirtyRuns() {
+        // 3 triples per inning = 9 runs/inning; over 9 innings that is 81 >= 30.
+        val player = GamePlayer(name = NAME, id = PID)
+        var state = BaseballState.new(listOf(player))
+        repeat(9) { state = state.applyTurn(singles = 0, doubles = 0, triples = 3) }
+        assertTrue(state.isFinished, "9 innings played -> finished")
+        assertTrue(state.perPlayer[0].total >= 30, "sanity: total clears the bar")
+        val g = GameRecord("r1", GameMode.BASEBALL, 12L, 12L, state)
+        val s = status("baseball_slugger", listOf(g))
+        assertTrue(s.unlocked, "30+ runs unlocks slugger")
+        assertEquals(12L, s.unlockedAtMs)
+    }
+
+    @Test
+    fun baseballSlugger_lockedBelowThreshold() {
+        // 1 single per inning = 1 run/inning -> 9 total < 30 -> locked.
+        val player = GamePlayer(name = NAME, id = PID)
+        var state = BaseballState.new(listOf(player))
+        repeat(9) { state = state.applyTurn(singles = 1, doubles = 0, triples = 0) }
+        assertTrue(state.isFinished)
+        val g = GameRecord("r1", GameMode.BASEBALL, 0L, 0L, state)
+        assertFalse(status("baseball_slugger", listOf(g)).unlocked, "9 runs is below 30")
+    }
+
+    // ---- countup_high -------------------------------------------------------
+
+    @Test
+    fun countUpHigh_reachingFourHundred() {
+        // 60 per round over 8 rounds = 480 >= 400.
+        val player = GamePlayer(name = NAME, id = PID)
+        var state = CountUpState.new(listOf(player))
+        repeat(8) { state = state.applyTurn(60) }
+        assertTrue(state.isFinished, "8 rounds played -> finished")
+        val g = GameRecord("r1", GameMode.COUNT_UP, 13L, 13L, state)
+        val s = status("countup_high", listOf(g))
+        assertTrue(s.unlocked, "480 clears the 400 bar")
+        assertEquals(13L, s.unlockedAtMs)
+    }
+
+    @Test
+    fun countUpHigh_lockedBelowThreshold() {
+        // 20 per round over 8 rounds = 160 < 400 -> locked.
+        val player = GamePlayer(name = NAME, id = PID)
+        var state = CountUpState.new(listOf(player))
+        repeat(8) { state = state.applyTurn(20) }
+        assertTrue(state.isFinished)
+        val g = GameRecord("r1", GameMode.COUNT_UP, 0L, 0L, state)
+        assertFalse(status("countup_high", listOf(g)).unlocked, "160 is below 400")
+    }
+
+    // ---- gotcha_winner ------------------------------------------------------
+
+    @Test
+    fun gotchaWinner_landingExactlyOnTarget() {
+        // Single seat racing to 301: 180 then 121 lands exactly -> instant win.
+        val player = GamePlayer(name = NAME, id = PID)
+        var state = GotchaState.new(listOf(player), target = 301)
+        state = state.applyTurn(180)
+        state = state.applyTurn(121)
+        assertTrue(state.isFinished, "landed exactly on 301 -> won")
+        assertTrue(state.winnerIndices.contains(0))
+        val g = GameRecord("r1", GameMode.GOTCHA, 14L, 14L, state)
+        val s = status("gotcha_winner", listOf(g))
+        assertTrue(s.unlocked, "winning Gotcha unlocks the achievement")
+        assertEquals(14L, s.unlockedAtMs)
+    }
+
+    @Test
+    fun gotchaWinner_lockedWhenNotWon() {
+        // Two turns that never reach 301 -> game unfinished, no winner -> locked.
+        val player = GamePlayer(name = NAME, id = PID)
+        var state = GotchaState.new(listOf(player), target = 301)
+        state = state.applyTurn(100)
+        state = state.applyTurn(100)
+        assertFalse(state.isFinished, "still short of target")
+        val g = GameRecord("r1", GameMode.GOTCHA, 0L, 0L, state)
+        assertFalse(status("gotcha_winner", listOf(g)).unlocked, "no win -> locked")
+    }
+
+    // ---- bot_slayer_pro / bot_slayer_hard -----------------------------------
+
+    /**
+     * A two-seat X01 game where the human [PID] sits at seat 0 and a CPU opponent
+     * of [level] sits at seat 1. [humanWins] decides who is recorded as the winner.
+     */
+    private fun botGame(
+        recId: String,
+        level: BotLevel,
+        humanWins: Boolean,
+        mode: GameMode = GameMode.X01,
+        createdAt: Long = 0L,
+    ): GameRecord {
+        val human = GamePlayer(name = NAME, id = PID)
+        val bot = GamePlayer(name = "CPU", id = "bot:1", isBot = true, botLevel = level)
+        val state = X01State(
+            players = listOf(human, bot),
+            perPlayer = listOf(
+                X01PlayerState(human, listOf(turn(40, 40, finished = true))),
+                X01PlayerState(bot, listOf(turn(40, 20))),
+            ),
+            startScore = 40,
+            winnerIndices = if (humanWins) listOf(0) else listOf(1),
+        )
+        return GameRecord(recId, mode, createdAt, createdAt, state)
+    }
+
+    @Test
+    fun botSlayerPro_beatingAProBot() {
+        val g = botGame("r1", BotLevel.PRO, humanWins = true, createdAt = 21L)
+        val all = achievementsFor(PID, listOf(g))
+        assertTrue(all.byId("bot_slayer_pro").unlocked, "beat a PRO bot")
+        assertEquals(21L, all.byId("bot_slayer_pro").unlockedAtMs)
+        // Beating PRO does not imply the HARD-specific feat.
+        assertFalse(all.byId("bot_slayer_hard").unlocked, "opponent was PRO, not HARD")
+    }
+
+    @Test
+    fun botSlayerHard_beatingAHardBot() {
+        val g = botGame("r1", BotLevel.HARD, humanWins = true, mode = GameMode.COUNT_UP)
+        val s = status("bot_slayer_hard", listOf(g))
+        assertTrue(s.unlocked, "beat a HARD bot in Count-Up (keys on the seat, not the mode)")
+    }
+
+    @Test
+    fun botSlayer_lockedWhenBotWins() {
+        // The PRO bot wins -> the human did not beat it -> both bot feats locked.
+        val g = botGame("r1", BotLevel.PRO, humanWins = false)
+        val all = achievementsFor(PID, listOf(g))
+        assertFalse(all.byId("bot_slayer_pro").unlocked, "human lost -> no slaying")
+        assertFalse(all.byId("bot_slayer_hard").unlocked)
+    }
+
+    @Test
+    fun botSlayer_lockedWhenOpponentTooEasy() {
+        // Human beats a MEDIUM bot: neither the HARD nor PRO feat unlocks.
+        val g = botGame("r1", BotLevel.MEDIUM, humanWins = true)
+        val all = achievementsFor(PID, listOf(g))
+        assertFalse(all.byId("bot_slayer_pro").unlocked, "MEDIUM is below PRO")
+        assertFalse(all.byId("bot_slayer_hard").unlocked, "MEDIUM is below HARD")
+    }
+
+    // ---- mode_explorer ------------------------------------------------------
+
+    @Test
+    fun modeExplorer_countsDistinctModesPlayed() {
+        // Play (not necessarily win) 7 distinct modes -> locked at 7; an 8th
+        // distinct mode unlocks. Wins are irrelevant to "played".
+        val player = GamePlayer(name = NAME, id = PID)
+        fun playRecord(id: String, mode: GameMode): GameRecord {
+            val state = X01State(
+                players = listOf(player),
+                perPlayer = listOf(X01PlayerState(player, listOf(turn(40, 20)))),
+                startScore = 40,
+            )
+            return GameRecord(id, mode, 0L, 0L, state)
+        }
+        val sevenModes = listOf(
+            GameMode.X01, GameMode.CRICKET, GameMode.HALF_IT, GameMode.AROUND_CLOCK,
+            GameMode.BOBS_27, GameMode.SHANGHAI, GameMode.CATCH_40,
+        )
+        val seven = sevenModes.mapIndexed { i, m -> playRecord("g$i", m) }
+        val sSeven = status("mode_explorer", seven)
+        assertFalse(sSeven.unlocked, "only 7 distinct modes played")
+        assertEquals(7, sSeven.progress)
+
+        val eight = seven + playRecord("g7", GameMode.COUNT_UP)
+        val sEight = status("mode_explorer", eight)
+        assertTrue(sEight.unlocked, "8 distinct modes -> unlocked")
+        assertEquals(8, sEight.progress)
+        assertNull(sEight.unlockedAtMs, "breadth unlock spans games")
+    }
+
+    // ---- streak_5 -----------------------------------------------------------
+
+    @Test
+    fun streak5_unlocksOnFiveConsecutiveWins() {
+        val g = (0 until 5).map { i ->
+            x01Record("r$i", listOf(turn(40, 40, finished = true)), startScore = 40, won = true, createdAt = i.toLong())
+        }
+        val s = status("streak_5", g)
+        assertTrue(s.unlocked, "five wins in a row")
+        assertEquals(5, s.progress, "best streak length is 5")
+        assertNull(s.unlockedAtMs, "streak spans games -> no single timestamp")
+        // A run of 5 also satisfies the lower streak_3 tier.
+        assertTrue(status("streak_3", g).unlocked, "5 in a row covers streak_3 too")
+    }
+
+    @Test
+    fun streak5_lockedAtFourConsecutiveWins() {
+        // W, W, W, W -> best run 4, below the streak_5 bar.
+        val g = (0 until 4).map { i ->
+            x01Record("r$i", listOf(turn(40, 40, finished = true)), startScore = 40, won = true, createdAt = i.toLong())
+        }
+        val s = status("streak_5", g)
+        assertFalse(s.unlocked, "four wins is not five")
+        assertEquals(4, s.progress, "best streak length is 4")
+    }
+
+    // ---- all_twelve ---------------------------------------------------------
+
+    @Test
+    fun allTwelve_requiresAWinInEveryMode() {
+        val player = GamePlayer(name = NAME, id = PID)
+        fun winRecord(id: String, mode: GameMode): GameRecord {
+            val state = X01State(
+                players = listOf(player),
+                perPlayer = listOf(X01PlayerState(player, listOf(turn(40, 40, finished = true)))),
+                startScore = 40,
+                winnerIndices = listOf(0),
+            )
+            return GameRecord(id, mode, 0L, 0L, state)
+        }
+        val allModes = GameMode.values().toList()
+        // Win every mode but one -> locked at size-1; adding the last unlocks.
+        val missingOne = allModes.dropLast(1).mapIndexed { i, m -> winRecord("g$i", m) }
+        val sMissing = status("all_twelve", missingOne)
+        assertFalse(sMissing.unlocked, "one mode still un-won")
+        assertEquals(allModes.size - 1, sMissing.progress)
+
+        val complete = missingOne + winRecord("last", allModes.last())
+        val sComplete = status("all_twelve", complete)
+        assertTrue(sComplete.unlocked, "a win in every mode unlocks all_twelve")
+        assertEquals(allModes.size, sComplete.progress)
+        assertNull(sComplete.unlockedAtMs, "spans games -> null timestamp")
     }
 
     // ---- edge cases: blank id, non-participant, summary ---------------------
