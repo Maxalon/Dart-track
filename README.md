@@ -3,14 +3,15 @@
 A native Android darts tracker built in Kotlin + Jetpack Compose. Players are
 **registered once** (a stable id plus a unique display name) and then **picked
 per seat** when starting a game, so every game and every statistic is tied to a
-real player rather than a free-typed name. Seven game modes — competitive and
-practice — local game history, deep per-player statistics, and an optional
-voice caller. Fully offline, no ads, no accounts.
+real player rather than a free-typed name. Twelve game modes — competitive and
+practice — an optional **CPU opponent**, local game history, deep per-player
+statistics, **achievements**, cross-player **leaderboards**, app **settings**,
+and an optional voice caller. Fully offline, no ads, no accounts.
 
 ## Game modes
 
-Seven modes, choosable from the New Game screen. X01, Cricket and Half-It are
-the competitive games; the rest form a **practice suite**.
+Twelve modes, choosable from the New Game screen. X01, Cricket, Half-It and
+Gotcha are the competitive games; the rest form a **practice suite**.
 
 - **X01** — start from 101, 201, 301, 401, 501, 701 or 901, with optional
   double-out. You enter a single 0-180 three-dart total per turn (numpad with
@@ -19,13 +20,23 @@ the competitive games; the rest form a **practice suite**.
   finishable. **Match play**: play a single leg, first-to-N legs (1/3/5/7), and
   optionally first-to-N sets (1/3/5). The throw order rotates each leg, a
   scoreboard shows legs/sets won, and Undo works across leg and set boundaries.
-  Stats aggregate over every leg of a match.
+  Stats aggregate over every leg of a match. A seat can be a **CPU opponent**
+  (see below).
 - **Cricket** — standard scoring on 20, 19, 18, 17, 16, 15 and bull. Per-target
   mark counters with +/− entry, up to 9 marks per turn (3 darts × triple). Win
   when you've closed all targets and your score leads or ties every opponent.
+  An optional **Cut-Throat** variant (a setup toggle): once you've closed a
+  target, your extra marks on it are charged as points **against** every
+  opponent who hasn't closed it yet, and the **lowest** score wins — turning the
+  scoring game into a defensive one.
 - **Half-It** — 9 fixed rounds (15, 16, any double, 17, 18, any triple, 19, 20,
   bullseye). You enter the points scored on each round's target; score 0 in a
   round and your running total is halved (rounded down). Highest total wins.
+- **Gotcha** — a race to land on **exactly** 301 or 501. You enter a 0-180
+  three-dart total each turn; overshooting the target **busts** (the turn scores
+  nothing and you stay put), and hitting it exactly wins instantly. The twist:
+  end a turn on the **same total** an opponent is currently sitting on (above 0)
+  and you knock them all the way back to 0 — one turn can reset several rivals.
 
 ### Practice suite
 
@@ -44,6 +55,40 @@ the competitive games; the rest form a **practice suite**.
   down from D20 (value 40) to D1. Catch your current double (≥1 hit) to score
   its value and drop to the next double; miss and you stay. Catching D1 finishes
   your ladder. Highest score wins (turns are capped to bound the game).
+- **Count-Up** — 8-round high-total practice. Like X01 you enter a single 0-180
+  three-dart total per turn, but there is no target to chase down: each total
+  simply adds to your running score. After 8 rounds the highest cumulative total
+  wins (ties allowed). A seat can be a **CPU opponent** (see below).
+- **Checkout Trainer** — a finishing drill over a ladder of double-out checkouts
+  (40, 60, 80, 100, 120, 140, 160, 170). Everyone attempts the same target in
+  turn before the ladder advances. Each attempt is one visit of up to 3 darts;
+  you record **Hit** (with the number of darts used, 1–3) or **Miss**. Your
+  score is the number of checkouts hit, and ties are broken by the **fewest
+  darts** used on those hits — so the more efficient finisher wins. The suggested
+  finishing route is shown for the current target.
+- **Baseball** — 9 innings on the numbers 1→9 (inning N targets number N). Each
+  turn you record how many singles, doubles and triples of the inning's number
+  you hit; the runs added are `s + 2d + 3t` (no inning multiplier, no instant
+  win — unlike Shanghai). Highest total after 9 innings wins.
+- **Golf** — 9 holes, hole N played on the number N, scored like stroke-play
+  golf where **lower is better**. You throw up to 3 darts at the number and
+  record your **best** dart: triple = 1 stroke, double = 2, single = 3, a miss =
+  5. Lowest total strokes after 9 holes wins.
+
+### CPU opponent
+
+In **X01** and **Count-Up**, any seat on the New Game screen can be made a
+**CPU** instead of a registered player, at one of four difficulties — **Easy**,
+**Medium**, **Hard** or **Pro** — anchored to real 3-dart averages (roughly 40 /
+60 / 80 / 100). You can mix humans and CPUs in the same game (at least one human
+seat is required). When it's a CPU's turn the app plays it automatically after a
+short pause; the bot's visit goes through the exact same scoring, persistence and
+undo path a human turn does, so its rules are identical. On a finish the bot
+attempts the checkout with a skill-scaled success rate.
+
+The opponent is a small, **fully offline, on-device** statistical model: each
+visit is built dart-by-dart from real board segments (so every total it produces
+is a legal 3-dart score), with no network, accounts or ads involved.
 
 ## Players & stats
 
@@ -54,7 +99,8 @@ the competitive games; the rest form a **practice suite**.
 - **Per-seat picker (required)** — the New Game screen gives each of the 1-4
   seats a searchable picker over registered players (you can also create a new
   player inline). A seat can't repeat a player already chosen in another seat,
-  and a game can't start until every seat is filled.
+  and a game can't start until every seat is filled. In X01 and Count-Up a seat
+  can instead be a **CPU** opponent; a game still needs at least one human seat.
 - **Per-player stats screen** — pick a player to see their numbers across all
   games: games played / won / win %, and for X01 a deep breakdown — 3-dart
   average, first-9 average, checkout %, 180s and ton+ counts (100+/140+), best
@@ -62,7 +108,21 @@ the competitive games; the rest form a **practice suite**.
   **score-band (per-visit) distribution**. Other modes get a per-mode summary
   (games, wins, and a mode-appropriate best). The screen surfaces additional
   views — such as a 3-dart-average **trend over time** and **head-to-head**
-  comparisons — as they become available.
+  comparisons — as they become available, and links to that player's
+  **achievements** (below).
+- **Achievements** — a board of 14 milestones, computed purely from a player's
+  game history and reached from the Player Stats screen. They span overall
+  dedication (play 10 / 50 / 100 games, win 25, win 3 in a row, win in 5
+  different modes), X01 feats (a 100+ visit, a maximum 180, a 100+ or the 170
+  "Big Fish" checkout, an 18-dart-or-fewer leg) and practice feats (an instant
+  Shanghai win, an Around the Clock win), grouped by category with progress bars
+  for the tiered ones.
+- **Leaderboards** — cross-player rankings reached from Home, one card per
+  category: most wins, most games, win %, best X01 3-dart average, most 180s,
+  best checkout %, and fewest darts to finish a leg. Each cell is read straight
+  from the same per-player stats above, so a leaderboard can never disagree with
+  a player's own numbers; the X01-only boards only rank players who have the
+  relevant data.
 
 > X01 stats are computed from the per-turn 3-dart totals the app stores (it
 > never records individual darts), so checkout % and the doubles-based figures
@@ -72,7 +132,8 @@ the competitive games; the rest form a **practice suite**.
 ## Score entry & UX
 
 - **Modern Material 3** design: a dartboard-red light/dark color scheme with
-  **dynamic color** (Material You) on Android 12+, plus a dark theme.
+  optional **dynamic color** (Material You) on Android 12+. The theme follows the
+  system by default, or can be forced to Light or Dark from **Settings**.
 - **Single-screen scoreboards**: every mode shares a consistent layout with the
   **active player as the hero** (large current score/target with a count-up
   animation), a bold current-player indicator, and — for X01 — a prominent
@@ -84,6 +145,25 @@ the competitive games; the rest form a **practice suite**.
   aloud via on-device text-to-speech. Off by default; fully offline.
 - **Animated navigation**: slide + fade transitions between screens (New Game
   enters as a slide-up modal).
+
+## Settings
+
+Reached from the gear on the Home screen, persisted to `<app-files>/settings.json`
+(a corrupt or older file degrades cleanly to defaults). Some preferences take
+effect immediately; others are stored now and wired up as the screens that
+consume them adopt them.
+
+- **Applied live:**
+  - **Theme** — System / Light / Dark, applied app-wide.
+  - **Material You** — toggles dynamic color on Android 12+ (no effect below).
+  - **Keep screen on** — holds the screen awake while the app is in front.
+  - **Confirm before delete** — when on, deleting a game from its detail screen
+    asks first; when off, it deletes immediately.
+- **Stored (persisted preferences, not yet applied):** a default for the voice
+  caller, sound effects, haptics, and X01 defaults for the start score and
+  double-out. These are saved and round-trip, but the game and New Game screens
+  don't read them yet — the voice caller still defaults off, and X01 setup still
+  starts at 501 / double-out — so they're wired but inert for now.
 
 ## Local data
 
@@ -110,10 +190,13 @@ the competitive games; the rest form a **practice suite**.
   3. creates a git tag `v0.1.<count>` and a GitHub Release with the APK attached
      as `dart-track-0.1.<count>.apk`.
 
-Unit tests live under `app/src/test/` and cover the game-mode rules (X01
-bust/finish/undo and stat math, Cricket scoring/win conditions, Half-It halving
-and the practice modes), the player registry, and JSON persistence round-trips.
-Run them with `./gradlew :app:testDebugUnitTest`.
+Unit tests live under `app/src/test/` — roughly **393** JVM tests — and cover
+the game-mode rules of every mode (X01 bust/finish/undo and stat math, Cricket
+scoring/win conditions including Cut-Throat, Half-It halving, Count-Up, Checkout
+Trainer, Baseball, Golf, Gotcha and the rest of the practice suite), the **CPU
+opponent** (its calibration and X01/Count-Up integration), **achievements**,
+**leaderboards & records**, **settings** encode/decode, the player registry, and
+JSON persistence round-trips. Run them with `./gradlew :app:testDebugUnitTest`.
 
 ## APK install
 
