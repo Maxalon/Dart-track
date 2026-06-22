@@ -136,6 +136,9 @@ fun AppRoot() {
                     onExit = { nav.popBackStack("home", inclusive = false) },
                 )
                 com.dartrack.model.GameMode.COUNT_UP -> CountUpScreen(
+                    recordId = id,
+                    onExit = { nav.popBackStack("home", inclusive = false) },
+                )
                 com.dartrack.model.GameMode.CHECKOUT_TRAINER -> CheckoutTrainerScreen(
                     recordId = id,
                     onExit = { nav.popBackStack("home", inclusive = false) },
