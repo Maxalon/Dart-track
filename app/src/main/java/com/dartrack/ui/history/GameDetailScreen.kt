@@ -30,6 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dartrack.data.GameRepository
+import com.dartrack.data.SettingsRepository
 import com.dartrack.model.GameMode
 import com.dartrack.model.AROUND_CLOCK_LAST_TARGET
 import com.dartrack.model.AroundTheClockState
@@ -54,10 +55,21 @@ fun GameDetailScreen(
 ) {
     val context = LocalContext.current
     val repo = remember { GameRepository.get(context) }
+    val settingsRepo = remember { SettingsRepository.get(context) }
     val games by repo.games.collectAsState()
+    val settings by settingsRepo.settings.collectAsState()
     val rec = games.firstOrNull { it.id == recordId }
     val scope = rememberCoroutineScope()
     var confirmDelete by remember { mutableStateOf(false) }
+
+    // Honor the "confirm before delete" preference: when off, delete straight
+    // away; when on, route through the confirmation dialog below.
+    fun deleteGame() {
+        scope.launch {
+            repo.delete(recordId)
+            onBack()
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -109,8 +121,10 @@ fun GameDetailScreen(
         }
 
         Spacer(Modifier.height(12.dp))
-        TextButton(onClick = { confirmDelete = true },
-            modifier = Modifier.padding(8.dp)) {
+        TextButton(
+            onClick = { if (settings.confirmBeforeDelete) confirmDelete = true else deleteGame() },
+            modifier = Modifier.padding(8.dp),
+        ) {
             Text("Delete game", color = MaterialTheme.colorScheme.error)
         }
     }
@@ -122,11 +136,8 @@ fun GameDetailScreen(
             text = { Text("This cannot be undone.") },
             confirmButton = {
                 TextButton(onClick = {
-                    scope.launch {
-                        repo.delete(recordId)
-                        confirmDelete = false
-                        onBack()
-                    }
+                    confirmDelete = false
+                    deleteGame()
                 }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {

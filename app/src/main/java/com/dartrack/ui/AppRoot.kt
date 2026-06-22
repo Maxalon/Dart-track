@@ -15,6 +15,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.dartrack.data.GameRepository
+import com.dartrack.data.SettingsRepository
 import com.dartrack.ui.game.AroundTheClockScreen
 import com.dartrack.ui.game.BobsTwentySevenScreen
 import com.dartrack.ui.game.Catch40Screen
@@ -26,10 +27,12 @@ import com.dartrack.ui.history.GameDetailScreen
 import com.dartrack.ui.history.HistoryScreen
 import com.dartrack.ui.home.HomeScreen
 import com.dartrack.ui.players.PlayerManagementScreen
+import com.dartrack.ui.settings.SettingsScreen
 import com.dartrack.ui.setup.NewGameScreen
 import com.dartrack.ui.stats.PlayerStatsScreen
 import com.dartrack.ui.stats.StatsScreen
 import com.dartrack.viewmodel.AppViewModel
+import com.dartrack.viewmodel.SettingsViewModel
 
 @Composable
 fun AppRoot() {
@@ -41,6 +44,13 @@ fun AppRoot() {
 
     val appVm: AppViewModel = viewModel(factory = AppViewModel.Factory(repo))
     val games by appVm.games.collectAsState()
+
+    // Settings: MainActivity owns the initial load (and applies theme/keep-on);
+    // here we only expose the StateFlow + an update lambda to the settings route.
+    val settingsRepo = SettingsRepository.get(context)
+    val settingsVm: SettingsViewModel =
+        viewModel(factory = SettingsViewModel.Factory(settingsRepo))
+    val settings by settingsVm.settings.collectAsState()
 
     NavHost(
         navController = nav,
@@ -73,6 +83,7 @@ fun AppRoot() {
                 onStats = { nav.navigate("stats") },
                 onPlayerStats = { nav.navigate("player_stats") },
                 onManagePlayers = { nav.navigate("players") },
+                onSettings = { nav.navigate("settings") },
             )
         }
         composable(
@@ -157,6 +168,13 @@ fun AppRoot() {
         }
         composable("players") {
             PlayerManagementScreen(onBack = { nav.popBackStack() })
+        }
+        composable("settings") {
+            SettingsScreen(
+                settings = settings,
+                onChange = { next -> settingsVm.update { next } },
+                onBack = { nav.popBackStack() },
+            )
         }
     }
 }
