@@ -33,6 +33,7 @@ import com.dartrack.ui.game.GotchaScreen
 import com.dartrack.ui.game.HalfItGameScreen
 import com.dartrack.ui.game.ShanghaiScreen
 import com.dartrack.ui.game.X01GameScreen
+import com.dartrack.ui.help.HowToPlayScreen
 import com.dartrack.ui.history.GameDetailScreen
 import com.dartrack.ui.history.HistoryScreen
 import com.dartrack.ui.home.HomeScreen
@@ -96,6 +97,7 @@ fun AppRoot() {
                 onLeaderboards = { nav.navigate("leaderboards") },
                 onManagePlayers = { nav.navigate("players") },
                 onSettings = { nav.navigate("settings") },
+                onHowToPlay = { nav.navigate("how_to_play") },
             )
         }
         composable(
@@ -203,6 +205,9 @@ fun AppRoot() {
         }
         composable("leaderboards") {
             LeaderboardsScreen(onBack = { nav.popBackStack() })
+        }
+        composable("how_to_play") {
+            HowToPlayScreen(onBack = { nav.popBackStack() })
         }
         composable("achievements/{playerId}") { backstack ->
             val playerId = backstack.arguments?.getString("playerId") ?: return@composable

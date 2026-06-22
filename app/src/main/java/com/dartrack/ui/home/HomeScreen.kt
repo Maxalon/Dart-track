@@ -38,6 +38,7 @@ fun HomeScreen(
     onLeaderboards: () -> Unit,
     onManagePlayers: () -> Unit,
     onSettings: () -> Unit,
+    onHowToPlay: () -> Unit,
 ) {
     Box(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
         // Settings gear pinned to the top-end corner, above the centered menu.
@@ -101,6 +102,10 @@ fun HomeScreen(
             Spacer(Modifier.height(12.dp))
             OutlinedButton(onClick = onManagePlayers, modifier = Modifier.fillMaxWidth()) {
                 Text("Manage players")
+            }
+            Spacer(Modifier.height(12.dp))
+            OutlinedButton(onClick = onHowToPlay, modifier = Modifier.fillMaxWidth()) {
+                Text("How to play")
             }
         }
     }
