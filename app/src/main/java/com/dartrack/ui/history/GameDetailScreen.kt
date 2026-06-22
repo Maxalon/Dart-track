@@ -36,6 +36,7 @@ import com.dartrack.model.AroundTheClockState
 import com.dartrack.model.BOBS27_LAST_DOUBLE
 import com.dartrack.model.BobsTwentySevenState
 import com.dartrack.model.Catch40State
+import com.dartrack.model.CheckoutTrainerState
 import com.dartrack.model.CRICKET_TARGETS
 import com.dartrack.model.CricketState
 import com.dartrack.model.HalfItState
@@ -89,6 +90,7 @@ fun GameDetailScreen(
                     GameMode.BOBS_27 -> "Bob's 27"
                     GameMode.SHANGHAI -> "Shanghai"
                     GameMode.CATCH_40 -> "Catch 40"
+                    GameMode.CHECKOUT_TRAINER -> "Checkout Trainer"
                 }, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                 Text("Started: ${df.format(Date(rec.createdAtEpochMs))}")
                 Text("Updated: ${df.format(Date(rec.updatedAtEpochMs))}")
@@ -106,6 +108,7 @@ fun GameDetailScreen(
             is BobsTwentySevenState -> BobsTwentySevenDetail(s)
             is ShanghaiState -> ShanghaiDetail(s)
             is Catch40State -> Catch40Detail(s)
+            is CheckoutTrainerState -> CheckoutTrainerDetail(s)
         }
 
         Spacer(Modifier.height(12.dp))
@@ -298,6 +301,39 @@ private fun Catch40Detail(s: Catch40State) {
                     Text(
                         "hits per turn: " +
                             ps.turns.joinToString(" · ") { it.hits.toString() },
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Spacer(Modifier.height(6.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun CheckoutTrainerDetail(s: CheckoutTrainerState) {
+    Card(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(
+                "targets: " + s.targets.joinToString(" · "),
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(6.dp))
+            s.players.forEachIndexed { idx, p ->
+                val ps = s.perPlayer[idx]
+                Text(
+                    "${p.name}: ${ps.hits} hits · ${ps.dartsOnHits} darts on hits",
+                    fontWeight = FontWeight.SemiBold,
+                )
+                if (ps.attempts.isNotEmpty()) {
+                    Text(
+                        "attempts (target → result): " +
+                            ps.attempts.mapIndexed { i, a ->
+                                val tgt = s.targets.getOrNull(i) ?: "?"
+                                "$tgt→" + (if (a.hit) "✓${a.darts}" else "✗")
+                            }.joinToString(" · "),
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

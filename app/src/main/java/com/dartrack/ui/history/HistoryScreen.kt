@@ -141,6 +141,7 @@ fun HistoryScreen(
                                         GameMode.BOBS_27 -> "Bob's 27"
                                         GameMode.SHANGHAI -> "Shanghai"
                                         GameMode.CATCH_40 -> "Catch 40"
+                                        GameMode.CHECKOUT_TRAINER -> "Checkout Trainer"
                                     },
                                     fontWeight = FontWeight.SemiBold,
                                     modifier = Modifier.weight(1f),

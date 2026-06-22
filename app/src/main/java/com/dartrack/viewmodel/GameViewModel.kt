@@ -9,6 +9,7 @@ import com.dartrack.model.GameState
 import com.dartrack.model.AroundTheClockState
 import com.dartrack.model.BobsTwentySevenState
 import com.dartrack.model.Catch40State
+import com.dartrack.model.CheckoutTrainerState
 import com.dartrack.model.CricketState
 import com.dartrack.model.HalfItState
 import com.dartrack.model.ShanghaiState
@@ -84,6 +85,11 @@ class GameViewModel(
         mutate { (it as Catch40State).applyTurn(hits) }
 
     fun undoCatch40() = mutate { (it as Catch40State).undoLast() }
+
+    fun applyCheckoutAttempt(hit: Boolean, darts: Int) =
+        mutate { (it as CheckoutTrainerState).applyAttempt(hit, darts) }
+
+    fun undoCheckout() = mutate { (it as CheckoutTrainerState).undoLast() }
 
     class Factory(
         private val repo: GameRepository,
