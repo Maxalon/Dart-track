@@ -154,10 +154,13 @@ data class CricketState(
     }
 
     companion object {
-        fun new(players: List<GamePlayer>, cutThroat: Boolean = false): CricketState = CricketState(
-            players = players,
-            perPlayer = players.map { CricketPlayerState(it) },
-            cutThroat = cutThroat,
-        )
+        fun new(players: List<GamePlayer>, cutThroat: Boolean = false): CricketState {
+            require(players.isNotEmpty()) { "Cricket needs at least one player" }
+            return CricketState(
+                players = players,
+                perPlayer = players.map { CricketPlayerState(it) },
+                cutThroat = cutThroat,
+            )
+        }
     }
 }

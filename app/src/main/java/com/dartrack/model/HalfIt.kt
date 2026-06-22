@@ -124,9 +124,12 @@ data class HalfItState(
         HALF_IT_ROUNDS.getOrNull(currentRound)
 
     companion object {
-        fun new(players: List<GamePlayer>): HalfItState = HalfItState(
-            players = players,
-            perPlayer = players.map { HalfItPlayerState(it) },
-        )
+        fun new(players: List<GamePlayer>): HalfItState {
+            require(players.isNotEmpty()) { "Half-It needs at least one player" }
+            return HalfItState(
+                players = players,
+                perPlayer = players.map { HalfItPlayerState(it) },
+            )
+        }
     }
 }

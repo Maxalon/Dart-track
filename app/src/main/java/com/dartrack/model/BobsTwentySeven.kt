@@ -213,9 +213,12 @@ data class BobsTwentySevenState(
     }
 
     companion object {
-        fun new(players: List<GamePlayer>): BobsTwentySevenState = BobsTwentySevenState(
-            players = players,
-            perPlayer = players.map { BobsTwentySevenPlayerState(it) },
-        )
+        fun new(players: List<GamePlayer>): BobsTwentySevenState {
+            require(players.isNotEmpty()) { "Bob's 27 needs at least one player" }
+            return BobsTwentySevenState(
+                players = players,
+                perPlayer = players.map { BobsTwentySevenPlayerState(it) },
+            )
+        }
     }
 }

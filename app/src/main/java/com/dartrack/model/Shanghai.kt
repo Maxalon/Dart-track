@@ -200,9 +200,12 @@ data class ShanghaiState(
     }
 
     companion object {
-        fun new(players: List<GamePlayer>): ShanghaiState = ShanghaiState(
-            players = players,
-            perPlayer = players.map { ShanghaiPlayerState(it) },
-        )
+        fun new(players: List<GamePlayer>): ShanghaiState {
+            require(players.isNotEmpty()) { "Shanghai needs at least one player" }
+            return ShanghaiState(
+                players = players,
+                perPlayer = players.map { ShanghaiPlayerState(it) },
+            )
+        }
     }
 }

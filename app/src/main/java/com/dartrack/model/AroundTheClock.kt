@@ -95,9 +95,12 @@ data class AroundTheClockState(
     }
 
     companion object {
-        fun new(players: List<GamePlayer>): AroundTheClockState = AroundTheClockState(
-            players = players,
-            perPlayer = players.map { AroundTheClockPlayerState(it) },
-        )
+        fun new(players: List<GamePlayer>): AroundTheClockState {
+            require(players.isNotEmpty()) { "Around the Clock needs at least one player" }
+            return AroundTheClockState(
+                players = players,
+                perPlayer = players.map { AroundTheClockPlayerState(it) },
+            )
+        }
     }
 }
