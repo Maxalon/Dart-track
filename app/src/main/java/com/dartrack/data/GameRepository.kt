@@ -5,6 +5,7 @@ import com.dartrack.model.AroundTheClockState
 import com.dartrack.model.BobsTwentySevenState
 import com.dartrack.model.Catch40State
 import com.dartrack.model.CountUpState
+import com.dartrack.model.CheckoutTrainerState
 import com.dartrack.model.CricketState
 import com.dartrack.model.GamePlayer
 import com.dartrack.model.GameState
@@ -165,6 +166,7 @@ fun GameState.withPlayers(players: List<GamePlayer>): GameState = when (this) {
     is ShanghaiState -> copy(players = players)
     is Catch40State -> copy(players = players)
     is CountUpState -> copy(players = players)
+    is CheckoutTrainerState -> copy(players = players)
 }
 
 /** A game record paired with whether [reassignPlayerInRecords] changed it. */

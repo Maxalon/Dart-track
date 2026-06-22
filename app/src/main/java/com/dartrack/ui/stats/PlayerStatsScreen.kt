@@ -362,6 +362,12 @@ private fun ModeSummariesCard(s: PlayerStatsData) {
         if (s.catch40.gamesPlayed > 0) {
             add("Catch 40" to "${s.catch40.gamesPlayed} games · wins ${s.catch40.gamesWon} · high ${s.catch40.best}")
         }
+        if (s.countUp.gamesPlayed > 0) {
+            add("Count-Up" to "${s.countUp.gamesPlayed} games · wins ${s.countUp.gamesWon} · high ${s.countUp.best}")
+        }
+        if (s.checkoutTrainer.gamesPlayed > 0) {
+            add("Checkout Trainer" to "${s.checkoutTrainer.gamesPlayed} games · wins ${s.checkoutTrainer.gamesWon} · best ${s.checkoutTrainer.best} hits")
+        }
     }
     if (rows.isEmpty()) return
     StatsCard("Other modes") {

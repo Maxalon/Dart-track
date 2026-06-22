@@ -19,6 +19,7 @@ import com.dartrack.ui.game.AroundTheClockScreen
 import com.dartrack.ui.game.BobsTwentySevenScreen
 import com.dartrack.ui.game.Catch40Screen
 import com.dartrack.ui.game.CountUpScreen
+import com.dartrack.ui.game.CheckoutTrainerScreen
 import com.dartrack.ui.game.CricketGameScreen
 import com.dartrack.ui.game.HalfItGameScreen
 import com.dartrack.ui.game.ShanghaiScreen
@@ -135,6 +136,7 @@ fun AppRoot() {
                     onExit = { nav.popBackStack("home", inclusive = false) },
                 )
                 com.dartrack.model.GameMode.COUNT_UP -> CountUpScreen(
+                com.dartrack.model.GameMode.CHECKOUT_TRAINER -> CheckoutTrainerScreen(
                     recordId = id,
                     onExit = { nav.popBackStack("home", inclusive = false) },
                 )

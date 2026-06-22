@@ -5,6 +5,7 @@ import com.dartrack.model.AroundTheClockState
 import com.dartrack.model.BobsTwentySevenState
 import com.dartrack.model.Catch40State
 import com.dartrack.model.CountUpState
+import com.dartrack.model.CheckoutTrainerState
 import com.dartrack.model.CricketState
 import com.dartrack.model.HalfItState
 import com.dartrack.model.ShanghaiState
@@ -199,6 +200,10 @@ object StatsAggregator {
                 // Count-Up statistics are out of scope for now; the branch only
                 // exists to keep this `when` exhaustive.
                 is CountUpState -> {}
+                // Checkout Trainer statistics are out of scope for this
+                // name-keyed aggregator; the branch only exists to keep this
+                // `when` exhaustive (see playerStats for the id-keyed summary).
+                is CheckoutTrainerState -> {}
             }
         }
 

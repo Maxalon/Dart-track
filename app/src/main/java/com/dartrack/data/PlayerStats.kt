@@ -4,6 +4,7 @@ import com.dartrack.model.AroundTheClockState
 import com.dartrack.model.BobsTwentySevenState
 import com.dartrack.model.Catch40State
 import com.dartrack.model.CountUpState
+import com.dartrack.model.CheckoutTrainerState
 import com.dartrack.model.CricketState
 import com.dartrack.model.HalfItState
 import com.dartrack.model.ShanghaiState
@@ -76,6 +77,7 @@ data class ModeSummary(
      *  - Bob's 27: highest final score reached in any game.
      *  - Catch 40: highest final score reached in any game.
      *  - Count-Up: highest final total reached in any game.
+     *  - Checkout Trainer: highest number of checkouts HIT in any game.
      *  - Around the Clock: fewest darts to clear the board in a WON game (0 if
      *    the player never finished a game).
      */
@@ -117,6 +119,7 @@ data class PlayerStatsData(
     val shanghai: ModeSummary,
     val catch40: ModeSummary,
     val countUp: ModeSummary,
+    val checkoutTrainer: ModeSummary,
 )
 
 /**
@@ -173,6 +176,7 @@ fun playerStats(playerId: String, games: List<GameRecord>): PlayerStatsData {
     var shanghaiPlayed = 0; var shanghaiWon = 0; var shanghaiHigh = 0
     var catchPlayed = 0; var catchWon = 0; var catchHigh = 0
     var countUpPlayed = 0; var countUpWon = 0; var countUpHigh = 0
+    var checkoutPlayed = 0; var checkoutWon = 0; var checkoutBestHits = 0
 
     if (playerId.isNotBlank()) {
         for (r in games) {
@@ -288,6 +292,11 @@ fun playerStats(playerId: String, games: List<GameRecord>): PlayerStatsData {
                     if (won) countUpWon++
                     countUpHigh = maxOf(countUpHigh, s.perPlayer[idx].total)
                 }
+                is CheckoutTrainerState -> {
+                    checkoutPlayed++
+                    if (won) checkoutWon++
+                    checkoutBestHits = maxOf(checkoutBestHits, s.perPlayer[idx].hits)
+                }
             }
         }
     }
@@ -342,6 +351,7 @@ fun playerStats(playerId: String, games: List<GameRecord>): PlayerStatsData {
         shanghai = ModeSummary(shanghaiPlayed, shanghaiWon, best = shanghaiHigh),
         catch40 = ModeSummary(catchPlayed, catchWon, best = catchHigh),
         countUp = ModeSummary(countUpPlayed, countUpWon, best = countUpHigh),
+        checkoutTrainer = ModeSummary(checkoutPlayed, checkoutWon, best = checkoutBestHits),
     )
 }
 
