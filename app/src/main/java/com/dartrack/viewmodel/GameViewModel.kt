@@ -9,6 +9,7 @@ import com.dartrack.model.GameState
 import com.dartrack.model.AroundTheClockState
 import com.dartrack.model.BobsTwentySevenState
 import com.dartrack.model.Catch40State
+import com.dartrack.model.CountUpState
 import com.dartrack.model.CricketState
 import com.dartrack.model.HalfItState
 import com.dartrack.model.ShanghaiState
@@ -84,6 +85,11 @@ class GameViewModel(
         mutate { (it as Catch40State).applyTurn(hits) }
 
     fun undoCatch40() = mutate { (it as Catch40State).undoLast() }
+
+    fun applyCountUpTurn(total: Int) =
+        mutate { (it as CountUpState).applyTurn(total) }
+
+    fun undoCountUp() = mutate { (it as CountUpState).undoLast() }
 
     class Factory(
         private val repo: GameRepository,
