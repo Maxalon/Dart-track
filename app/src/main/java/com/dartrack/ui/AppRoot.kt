@@ -34,6 +34,7 @@ import com.dartrack.ui.history.GameDetailScreen
 import com.dartrack.ui.history.HistoryScreen
 import com.dartrack.ui.home.HomeScreen
 import com.dartrack.ui.players.PlayerManagementScreen
+import com.dartrack.ui.records.LeaderboardsScreen
 import com.dartrack.ui.settings.SettingsScreen
 import com.dartrack.ui.setup.NewGameScreen
 import com.dartrack.ui.stats.PlayerStatsScreen
@@ -89,6 +90,7 @@ fun AppRoot() {
                 onHistory = { nav.navigate("history") },
                 onStats = { nav.navigate("stats") },
                 onPlayerStats = { nav.navigate("player_stats") },
+                onLeaderboards = { nav.navigate("leaderboards") },
                 onManagePlayers = { nav.navigate("players") },
                 onSettings = { nav.navigate("settings") },
             )
@@ -183,6 +185,9 @@ fun AppRoot() {
                 onBack = { nav.popBackStack() },
                 onOpenAchievements = { playerId -> nav.navigate("achievements/$playerId") },
             )
+        }
+        composable("leaderboards") {
+            LeaderboardsScreen(onBack = { nav.popBackStack() })
         }
         composable("achievements/{playerId}") { backstack ->
             val playerId = backstack.arguments?.getString("playerId") ?: return@composable
