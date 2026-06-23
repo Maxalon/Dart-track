@@ -1,9 +1,14 @@
 package com.dartrack.data
 
 import com.dartrack.model.AroundTheClockState
+import com.dartrack.model.BaseballState
 import com.dartrack.model.BobsTwentySevenState
 import com.dartrack.model.Catch40State
+import com.dartrack.model.CountUpState
+import com.dartrack.model.CheckoutTrainerState
 import com.dartrack.model.CricketState
+import com.dartrack.model.GolfState
+import com.dartrack.model.GotchaState
 import com.dartrack.model.HalfItState
 import com.dartrack.model.ShanghaiState
 import com.dartrack.model.X01State
@@ -74,8 +79,14 @@ data class ModeSummary(
      *  - Shanghai: highest final total reached in any game.
      *  - Bob's 27: highest final score reached in any game.
      *  - Catch 40: highest final score reached in any game.
+     *  - Count-Up: highest final total reached in any game.
+     *  - Checkout Trainer: highest number of checkouts HIT in any game.
      *  - Around the Clock: fewest darts to clear the board in a WON game (0 if
      *    the player never finished a game).
+     *  - Baseball: highest final total (runs) reached in any game.
+     *  - Golf: fewest total strokes across a game (0 if the player never played
+     *    a game; lower is better, so a sentinel of 0 means "no result").
+     *  - Gotcha: games won (mirrors [gamesWon]).
      */
     val best: Int,
 )
@@ -114,6 +125,11 @@ data class PlayerStatsData(
     val bobs27: ModeSummary,
     val shanghai: ModeSummary,
     val catch40: ModeSummary,
+    val countUp: ModeSummary,
+    val checkoutTrainer: ModeSummary,
+    val baseball: ModeSummary,
+    val golf: ModeSummary,
+    val gotcha: ModeSummary,
 )
 
 /**
@@ -169,6 +185,12 @@ fun playerStats(playerId: String, games: List<GameRecord>): PlayerStatsData {
     var bobsPlayed = 0; var bobsWon = 0; var bobsHigh = 0
     var shanghaiPlayed = 0; var shanghaiWon = 0; var shanghaiHigh = 0
     var catchPlayed = 0; var catchWon = 0; var catchHigh = 0
+    var countUpPlayed = 0; var countUpWon = 0; var countUpHigh = 0
+    var checkoutPlayed = 0; var checkoutWon = 0; var checkoutBestHits = 0
+    var baseballPlayed = 0; var baseballWon = 0; var baseballHigh = 0
+    // Golf is lowest-strokes; 0 is the "no result" sentinel (lower is better).
+    var golfPlayed = 0; var golfWon = 0; var golfBestStrokes = 0
+    var gotchaPlayed = 0; var gotchaWon = 0
 
     if (playerId.isNotBlank()) {
         for (r in games) {
@@ -279,6 +301,34 @@ fun playerStats(playerId: String, games: List<GameRecord>): PlayerStatsData {
                     if (won) catchWon++
                     catchHigh = maxOf(catchHigh, s.perPlayer[idx].score)
                 }
+                is CountUpState -> {
+                    countUpPlayed++
+                    if (won) countUpWon++
+                    countUpHigh = maxOf(countUpHigh, s.perPlayer[idx].total)
+                }
+                is CheckoutTrainerState -> {
+                    checkoutPlayed++
+                    if (won) checkoutWon++
+                    checkoutBestHits = maxOf(checkoutBestHits, s.perPlayer[idx].hits)
+                }
+                is BaseballState -> {
+                    baseballPlayed++
+                    if (won) baseballWon++
+                    baseballHigh = maxOf(baseballHigh, s.perPlayer[idx].total)
+                }
+                is GolfState -> {
+                    golfPlayed++
+                    if (won) golfWon++
+                    // Lowest strokes is best; 0 is the sentinel for "no result yet".
+                    val strokes = s.perPlayer[idx].strokes
+                    if (golfBestStrokes == 0 || strokes < golfBestStrokes) {
+                        golfBestStrokes = strokes
+                    }
+                }
+                is GotchaState -> {
+                    gotchaPlayed++
+                    if (won) gotchaWon++
+                }
             }
         }
     }
@@ -332,6 +382,11 @@ fun playerStats(playerId: String, games: List<GameRecord>): PlayerStatsData {
         bobs27 = ModeSummary(bobsPlayed, bobsWon, best = bobsHigh),
         shanghai = ModeSummary(shanghaiPlayed, shanghaiWon, best = shanghaiHigh),
         catch40 = ModeSummary(catchPlayed, catchWon, best = catchHigh),
+        countUp = ModeSummary(countUpPlayed, countUpWon, best = countUpHigh),
+        checkoutTrainer = ModeSummary(checkoutPlayed, checkoutWon, best = checkoutBestHits),
+        baseball = ModeSummary(baseballPlayed, baseballWon, best = baseballHigh),
+        golf = ModeSummary(golfPlayed, golfWon, best = golfBestStrokes),
+        gotcha = ModeSummary(gotchaPlayed, gotchaWon, best = gotchaWon),
     )
 }
 

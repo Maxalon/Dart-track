@@ -213,9 +213,12 @@ data class Catch40State(
     }
 
     companion object {
-        fun new(players: List<GamePlayer>): Catch40State = Catch40State(
-            players = players,
-            perPlayer = players.map { Catch40PlayerState(it) },
-        )
+        fun new(players: List<GamePlayer>): Catch40State {
+            require(players.isNotEmpty()) { "Catch 40 needs at least one player" }
+            return Catch40State(
+                players = players,
+                perPlayer = players.map { Catch40PlayerState(it) },
+            )
+        }
     }
 }

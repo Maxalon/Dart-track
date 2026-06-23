@@ -2,9 +2,14 @@ package com.dartrack.data
 
 import com.dartrack.model.GameMode
 import com.dartrack.model.AroundTheClockState
+import com.dartrack.model.BaseballState
 import com.dartrack.model.BobsTwentySevenState
 import com.dartrack.model.Catch40State
+import com.dartrack.model.CountUpState
+import com.dartrack.model.CheckoutTrainerState
 import com.dartrack.model.CricketState
+import com.dartrack.model.GolfState
+import com.dartrack.model.GotchaState
 import com.dartrack.model.HalfItState
 import com.dartrack.model.ShanghaiState
 import com.dartrack.model.X01State
@@ -195,6 +200,25 @@ object StatsAggregator {
                 // Catch 40 statistics are out of scope for now; the branch only
                 // exists to keep this `when` exhaustive.
                 is Catch40State -> {}
+                // Count-Up statistics are out of scope for now; the branch only
+                // exists to keep this `when` exhaustive.
+                is CountUpState -> {}
+                // Checkout Trainer statistics are out of scope for this
+                // name-keyed aggregator; the branch only exists to keep this
+                // `when` exhaustive (see playerStats for the id-keyed summary).
+                is CheckoutTrainerState -> {}
+                // Baseball statistics are out of scope for this name-keyed
+                // aggregator; the branch only exists to keep this `when`
+                // exhaustive (see playerStats for the id-keyed summary).
+                is BaseballState -> {}
+                // Golf statistics are out of scope for this name-keyed
+                // aggregator; the branch only exists to keep this `when`
+                // exhaustive (see playerStats for the id-keyed summary).
+                is GolfState -> {}
+                // Gotcha statistics are out of scope for this name-keyed
+                // aggregator; the branch only exists to keep this `when`
+                // exhaustive (see playerStats for the id-keyed summary).
+                is GotchaState -> {}
             }
         }
 

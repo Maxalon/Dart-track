@@ -324,7 +324,9 @@ data class X01State(
             doubleOut: Boolean = true,
             legsToWin: Int = 1,
             setsToWin: Int = 1,
-        ): X01State = X01State(
+        ): X01State {
+            require(players.isNotEmpty()) { "X01 needs at least one player" }
+            return X01State(
             players = players,
             perPlayer = players.map { X01PlayerState(it) },
             startScore = startScore,
@@ -335,7 +337,8 @@ data class X01State(
             completedLegs = emptyList(),
             setsToWin = setsToWin.coerceAtLeast(1),
             setWins = List(players.size) { 0 },
-        )
+            )
+        }
 
         val SUPPORTED_STARTS = listOf(101, 201, 301, 401, 501, 701, 901)
         val SUPPORTED_LEGS = listOf(1, 3, 5, 7)

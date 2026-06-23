@@ -9,27 +9,45 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.dartrack.data.GameRepository
+import com.dartrack.data.PlayerRepository
+import com.dartrack.data.SettingsRepository
+import com.dartrack.data.achievementSummary
+import com.dartrack.data.achievementsFor
+import com.dartrack.ui.achievements.AchievementsScreen
 import com.dartrack.ui.game.AroundTheClockScreen
+import com.dartrack.ui.game.BaseballScreen
 import com.dartrack.ui.game.BobsTwentySevenScreen
 import com.dartrack.ui.game.Catch40Screen
+import com.dartrack.ui.game.CountUpScreen
+import com.dartrack.ui.game.CheckoutTrainerScreen
 import com.dartrack.ui.game.CricketGameScreen
+import com.dartrack.ui.game.GolfScreen
+import com.dartrack.ui.game.GotchaScreen
 import com.dartrack.ui.game.HalfItGameScreen
 import com.dartrack.ui.game.ShanghaiScreen
 import com.dartrack.ui.game.X01GameScreen
+import com.dartrack.ui.help.HowToPlayScreen
 import com.dartrack.ui.history.GameDetailScreen
 import com.dartrack.ui.history.HistoryScreen
 import com.dartrack.ui.home.HomeScreen
 import com.dartrack.ui.players.PlayerManagementScreen
+import com.dartrack.ui.records.LeaderboardsScreen
+import com.dartrack.ui.settings.SettingsScreen
 import com.dartrack.ui.setup.NewGameScreen
 import com.dartrack.ui.stats.PlayerStatsScreen
 import com.dartrack.ui.stats.StatsScreen
+import com.dartrack.ui.tournament.NewTournamentScreen
+import com.dartrack.ui.tournament.TournamentDetailScreen
+import com.dartrack.ui.tournament.TournamentsScreen
 import com.dartrack.viewmodel.AppViewModel
+import com.dartrack.viewmodel.SettingsViewModel
 
 @Composable
 fun AppRoot() {
@@ -41,6 +59,13 @@ fun AppRoot() {
 
     val appVm: AppViewModel = viewModel(factory = AppViewModel.Factory(repo))
     val games by appVm.games.collectAsState()
+
+    // Settings: MainActivity owns the initial load (and applies theme/keep-on);
+    // here we only expose the StateFlow + an update lambda to the settings route.
+    val settingsRepo = SettingsRepository.get(context)
+    val settingsVm: SettingsViewModel =
+        viewModel(factory = SettingsViewModel.Factory(settingsRepo))
+    val settings by settingsVm.settings.collectAsState()
 
     NavHost(
         navController = nav,
@@ -72,7 +97,11 @@ fun AppRoot() {
                 onHistory = { nav.navigate("history") },
                 onStats = { nav.navigate("stats") },
                 onPlayerStats = { nav.navigate("player_stats") },
+                onLeaderboards = { nav.navigate("leaderboards") },
+                onTournaments = { nav.navigate("tournaments") },
                 onManagePlayers = { nav.navigate("players") },
+                onSettings = { nav.navigate("settings") },
+                onHowToPlay = { nav.navigate("how_to_play") },
             )
         }
         composable(
@@ -133,6 +162,26 @@ fun AppRoot() {
                     recordId = id,
                     onExit = { nav.popBackStack("home", inclusive = false) },
                 )
+                com.dartrack.model.GameMode.COUNT_UP -> CountUpScreen(
+                    recordId = id,
+                    onExit = { nav.popBackStack("home", inclusive = false) },
+                )
+                com.dartrack.model.GameMode.CHECKOUT_TRAINER -> CheckoutTrainerScreen(
+                    recordId = id,
+                    onExit = { nav.popBackStack("home", inclusive = false) },
+                )
+                com.dartrack.model.GameMode.BASEBALL -> BaseballScreen(
+                    recordId = id,
+                    onExit = { nav.popBackStack("home", inclusive = false) },
+                )
+                com.dartrack.model.GameMode.GOLF -> GolfScreen(
+                    recordId = id,
+                    onExit = { nav.popBackStack("home", inclusive = false) },
+                )
+                com.dartrack.model.GameMode.GOTCHA -> GotchaScreen(
+                    recordId = id,
+                    onExit = { nav.popBackStack("home", inclusive = false) },
+                )
             }
         }
         composable("history") {
@@ -153,10 +202,74 @@ fun AppRoot() {
             StatsScreen(onBack = { nav.popBackStack() })
         }
         composable("player_stats") {
-            PlayerStatsScreen(onBack = { nav.popBackStack() })
+            PlayerStatsScreen(
+                onBack = { nav.popBackStack() },
+                onOpenAchievements = { playerId -> nav.navigate("achievements/$playerId") },
+            )
+        }
+        composable("leaderboards") {
+            LeaderboardsScreen(onBack = { nav.popBackStack() })
+        }
+        composable("tournaments") {
+            TournamentsScreen(
+                onBack = { nav.popBackStack() },
+                onNew = { nav.navigate("new_tournament") },
+                onOpen = { id -> nav.navigate("tournament/$id") },
+            )
+        }
+        composable("new_tournament") {
+            NewTournamentScreen(
+                onCancel = { nav.popBackStack() },
+                onCreated = { id ->
+                    nav.navigate("tournament/$id") {
+                        popUpTo("tournaments")
+                    }
+                },
+            )
+        }
+        composable("tournament/{id}") { backstack ->
+            val id = backstack.arguments?.getString("id") ?: return@composable
+            TournamentDetailScreen(
+                tournamentId = id,
+                onBack = { nav.popBackStack() },
+                onPlayMatch = { gid -> nav.navigate("game/$gid") },
+            )
+        }
+        composable("how_to_play") {
+            HowToPlayScreen(onBack = { nav.popBackStack() })
+        }
+        composable("achievements/{playerId}") { backstack ->
+            val playerId = backstack.arguments?.getString("playerId") ?: return@composable
+            // Resolve the display name from the same registry PlayerStatsScreen
+            // uses; fall back to the player's stored seat name in any game (so a
+            // name still shows even if the registry has not loaded), then a
+            // generic label as a last resort.
+            val playerRepo = remember { PlayerRepository.get(context) }
+            LaunchedEffect(Unit) { playerRepo.load() }
+            val players by playerRepo.players.collectAsState()
+            val playerName = players.firstOrNull { it.id == playerId }?.name
+                ?: games.firstNotNullOfOrNull { rec ->
+                    rec.state.players.firstOrNull { it.id == playerId }?.name
+                }
+                ?: "Player"
+            val statuses = remember(games, playerId) { achievementsFor(playerId, games) }
+            val summary = remember(games, playerId) { achievementSummary(playerId, games) }
+            AchievementsScreen(
+                playerName = playerName,
+                statuses = statuses,
+                summary = summary,
+                onBack = { nav.popBackStack() },
+            )
         }
         composable("players") {
             PlayerManagementScreen(onBack = { nav.popBackStack() })
+        }
+        composable("settings") {
+            SettingsScreen(
+                settings = settings,
+                onChange = { next -> settingsVm.update { next } },
+                onBack = { nav.popBackStack() },
+            )
         }
     }
 }

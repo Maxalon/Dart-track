@@ -12,6 +12,9 @@ local.properties
 captures/
 .cxx/
 
+# Claude Code worktrees / local agent scratch
+.claude/
+
 # OS
 .DS_Store
 Thumbs.db

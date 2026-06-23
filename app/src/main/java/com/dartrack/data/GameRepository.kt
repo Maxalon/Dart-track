@@ -2,11 +2,16 @@ package com.dartrack.data
 
 import android.content.Context
 import com.dartrack.model.AroundTheClockState
+import com.dartrack.model.BaseballState
 import com.dartrack.model.BobsTwentySevenState
 import com.dartrack.model.Catch40State
+import com.dartrack.model.CountUpState
+import com.dartrack.model.CheckoutTrainerState
 import com.dartrack.model.CricketState
 import com.dartrack.model.GamePlayer
 import com.dartrack.model.GameState
+import com.dartrack.model.GolfState
+import com.dartrack.model.GotchaState
 import com.dartrack.model.HalfItState
 import com.dartrack.model.ShanghaiState
 import com.dartrack.model.X01State
@@ -163,6 +168,11 @@ fun GameState.withPlayers(players: List<GamePlayer>): GameState = when (this) {
     is BobsTwentySevenState -> copy(players = players)
     is ShanghaiState -> copy(players = players)
     is Catch40State -> copy(players = players)
+    is CountUpState -> copy(players = players)
+    is CheckoutTrainerState -> copy(players = players)
+    is BaseballState -> copy(players = players)
+    is GolfState -> copy(players = players)
+    is GotchaState -> copy(players = players)
 }
 
 /** A game record paired with whether [reassignPlayerInRecords] changed it. */

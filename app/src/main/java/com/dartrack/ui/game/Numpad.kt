@@ -15,10 +15,12 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Undo
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -153,7 +155,7 @@ fun ScoreNumpad(
                     modifier = Modifier.weight(1f).height(actionHeight),
                     shape = MaterialTheme.shapes.medium,
                 ) {
-                    Icon(Icons.Default.Undo, contentDescription = null)
+                    Icon(Icons.Default.Undo, contentDescription = "Undo last turn")
                     Spacer(Modifier.size(8.dp))
                     Text("Undo", style = MaterialTheme.typography.titleMedium)
                 }
@@ -174,13 +176,60 @@ fun ScoreNumpad(
                     contentColor = MaterialTheme.colorScheme.onPrimary,
                 ),
             ) {
-                Icon(Icons.Default.Check, contentDescription = null)
+                Icon(Icons.Default.Check, contentDescription = "Confirm score")
                 Spacer(Modifier.size(8.dp))
                 Text(
                     "Confirm",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.SemiBold,
                 )
+            }
+        }
+    }
+}
+
+/**
+ * Replaces the [ScoreNumpad] while a CPU seat is taking its turn: a subtle
+ * "CPU is throwing…" strip (so input is unmistakably disabled) with an optional
+ * Undo so the human can still revert the bot's last turn. The viewmodel drives
+ * the actual bot move; this is display-only.
+ */
+@Composable
+fun BotThrowingIndicator(
+    onUndo: (() -> Unit)? = null,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.large,
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            tonalElevation = 2.dp,
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                Spacer(Modifier.size(12.dp))
+                Text(
+                    "CPU is throwing…",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+        }
+        if (onUndo != null) {
+            Spacer(Modifier.height(6.dp))
+            OutlinedButton(
+                onClick = { onUndo() },
+                modifier = Modifier.fillMaxWidth().height(54.dp),
+                shape = MaterialTheme.shapes.medium,
+            ) {
+                Icon(Icons.Default.Undo, contentDescription = "Undo last turn")
+                Spacer(Modifier.size(8.dp))
+                Text("Undo", style = MaterialTheme.typography.titleMedium)
             }
         }
     }

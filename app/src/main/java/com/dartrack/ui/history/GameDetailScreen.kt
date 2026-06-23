@@ -30,14 +30,22 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dartrack.data.GameRepository
+import com.dartrack.data.SettingsRepository
 import com.dartrack.model.GameMode
 import com.dartrack.model.AROUND_CLOCK_LAST_TARGET
 import com.dartrack.model.AroundTheClockState
+import com.dartrack.model.BASEBALL_INNINGS
+import com.dartrack.model.BaseballState
 import com.dartrack.model.BOBS27_LAST_DOUBLE
 import com.dartrack.model.BobsTwentySevenState
 import com.dartrack.model.Catch40State
+import com.dartrack.model.CountUpState
+import com.dartrack.model.CheckoutTrainerState
 import com.dartrack.model.CRICKET_TARGETS
 import com.dartrack.model.CricketState
+import com.dartrack.model.GOLF_HOLES
+import com.dartrack.model.GolfState
+import com.dartrack.model.GotchaState
 import com.dartrack.model.HalfItState
 import com.dartrack.model.SHANGHAI_ROUNDS
 import com.dartrack.model.ShanghaiState
@@ -54,10 +62,21 @@ fun GameDetailScreen(
 ) {
     val context = LocalContext.current
     val repo = remember { GameRepository.get(context) }
+    val settingsRepo = remember { SettingsRepository.get(context) }
     val games by repo.games.collectAsState()
+    val settings by settingsRepo.settings.collectAsState()
     val rec = games.firstOrNull { it.id == recordId }
     val scope = rememberCoroutineScope()
     var confirmDelete by remember { mutableStateOf(false) }
+
+    // Honor the "confirm before delete" preference: when off, delete straight
+    // away; when on, route through the confirmation dialog below.
+    fun deleteGame() {
+        scope.launch {
+            repo.delete(recordId)
+            onBack()
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -89,6 +108,11 @@ fun GameDetailScreen(
                     GameMode.BOBS_27 -> "Bob's 27"
                     GameMode.SHANGHAI -> "Shanghai"
                     GameMode.CATCH_40 -> "Catch 40"
+                    GameMode.COUNT_UP -> "Count-Up"
+                    GameMode.CHECKOUT_TRAINER -> "Checkout Trainer"
+                    GameMode.BASEBALL -> "Baseball"
+                    GameMode.GOLF -> "Golf"
+                    GameMode.GOTCHA -> "Gotcha"
                 }, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                 Text("Started: ${df.format(Date(rec.createdAtEpochMs))}")
                 Text("Updated: ${df.format(Date(rec.updatedAtEpochMs))}")
@@ -106,11 +130,18 @@ fun GameDetailScreen(
             is BobsTwentySevenState -> BobsTwentySevenDetail(s)
             is ShanghaiState -> ShanghaiDetail(s)
             is Catch40State -> Catch40Detail(s)
+            is CountUpState -> CountUpDetail(s)
+            is CheckoutTrainerState -> CheckoutTrainerDetail(s)
+            is BaseballState -> BaseballDetail(s)
+            is GolfState -> GolfDetail(s)
+            is GotchaState -> GotchaDetail(s)
         }
 
         Spacer(Modifier.height(12.dp))
-        TextButton(onClick = { confirmDelete = true },
-            modifier = Modifier.padding(8.dp)) {
+        TextButton(
+            onClick = { if (settings.confirmBeforeDelete) confirmDelete = true else deleteGame() },
+            modifier = Modifier.padding(8.dp),
+        ) {
             Text("Delete game", color = MaterialTheme.colorScheme.error)
         }
     }
@@ -122,11 +153,8 @@ fun GameDetailScreen(
             text = { Text("This cannot be undone.") },
             confirmButton = {
                 TextButton(onClick = {
-                    scope.launch {
-                        repo.delete(recordId)
-                        confirmDelete = false
-                        onBack()
-                    }
+                    confirmDelete = false
+                    deleteGame()
                 }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
@@ -298,6 +326,141 @@ private fun Catch40Detail(s: Catch40State) {
                     Text(
                         "hits per turn: " +
                             ps.turns.joinToString(" · ") { it.hits.toString() },
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Spacer(Modifier.height(6.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun CountUpDetail(s: CountUpState) {
+    Card(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            s.players.forEachIndexed { idx, p ->
+                val ps = s.perPlayer[idx]
+                Text(
+                    "${p.name}: ${ps.total} · ${ps.darts} darts",
+                    fontWeight = FontWeight.SemiBold,
+                )
+                if (ps.turns.isNotEmpty()) {
+                    Text(
+                        "per round: " + ps.turns.joinToString(" · ") { it.toString() },
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Spacer(Modifier.height(6.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun CheckoutTrainerDetail(s: CheckoutTrainerState) {
+    Card(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(
+                "targets: " + s.targets.joinToString(" · "),
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(6.dp))
+            s.players.forEachIndexed { idx, p ->
+                val ps = s.perPlayer[idx]
+                Text(
+                    "${p.name}: ${ps.hits} hits · ${ps.dartsOnHits} darts on hits",
+                    fontWeight = FontWeight.SemiBold,
+                )
+                if (ps.attempts.isNotEmpty()) {
+                    Text(
+                        "attempts (target → result): " +
+                            ps.attempts.mapIndexed { i, a ->
+                                val tgt = s.targets.getOrNull(i) ?: "?"
+                                "$tgt→" + (if (a.hit) "✓${a.darts}" else "✗")
+                            }.joinToString(" · "),
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Spacer(Modifier.height(6.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun BaseballDetail(s: BaseballState) {
+    Card(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            s.players.forEachIndexed { idx, p ->
+                val ps = s.perPlayer[idx]
+                Text(
+                    "${p.name}: ${ps.total} · ${ps.darts} darts",
+                    fontWeight = FontWeight.SemiBold,
+                )
+                if (ps.innings.isNotEmpty()) {
+                    Text(
+                        "innings 1–$BASEBALL_INNINGS (s/d/t): " +
+                            ps.innings.joinToString(" · ") {
+                                "${it.singles}/${it.doubles}/${it.triples}"
+                            },
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Spacer(Modifier.height(6.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun GolfDetail(s: GolfState) {
+    Card(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            s.players.forEachIndexed { idx, p ->
+                val ps = s.perPlayer[idx]
+                Text(
+                    "${p.name}: ${ps.strokes} strokes · ${ps.holesPlayed}/$GOLF_HOLES holes",
+                    fontWeight = FontWeight.SemiBold,
+                )
+                if (ps.results.isNotEmpty()) {
+                    Text(
+                        "per hole (strokes): " +
+                            ps.results.joinToString(" · ") { it.strokes.toString() },
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Spacer(Modifier.height(6.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun GotchaDetail(s: GotchaState) {
+    Card(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(
+                "target: ${s.target}",
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(6.dp))
+            s.players.forEachIndexed { idx, p ->
+                val ps = s.perPlayer[idx]
+                Text(
+                    "${p.name}: ${ps.total} · ${ps.darts} darts",
+                    fontWeight = FontWeight.SemiBold,
+                )
+                if (ps.turns.isNotEmpty()) {
+                    Text(
+                        "per turn: " + ps.turns.joinToString(" · ") { it.toString() },
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

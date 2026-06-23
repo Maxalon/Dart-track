@@ -49,14 +49,26 @@ data class CricketState(
     val perPlayer: List<CricketPlayerState>,
     override val currentPlayerIndex: Int = 0,
     override val winnerIndices: List<Int> = emptyList(),
+    /**
+     * When true, plays Cut-Throat (American) Cricket: excess marks penalise
+     * opponents instead of rewarding the thrower, and the LOWEST score wins.
+     * Defaults to false ⇒ standard Cricket behaviour, byte-for-byte unchanged.
+     */
+    val cutThroat: Boolean = false,
 ) : GameState {
 
     /**
-     * Score is computed: for each target, if you've closed it (>=3 marks) and
-     * at least one opponent has not, every additional mark on it counts as
-     * (target × marks-past-3) points.
+     * Score is computed per target. Standard: if you've closed it (>=3 marks)
+     * and at least one opponent has not, every additional mark on it counts as
+     * (target × marks-past-3) points for YOU. Cut-throat inverts this: those
+     * excess points are charged AGAINST you for every target an opponent has
+     * closed while you have not — i.e. you receive the points opponents "give
+     * away" — and the lowest total wins.
      */
-    fun scoreFor(playerIndex: Int): Int {
+    fun scoreFor(playerIndex: Int): Int =
+        if (cutThroat) cutThroatScoreFor(playerIndex) else standardScoreFor(playerIndex)
+
+    private fun standardScoreFor(playerIndex: Int): Int {
         val me = perPlayer[playerIndex]
         val cum = me.cumulativeMarks()
         var total = 0
@@ -68,6 +80,26 @@ data class CricketState(
                 .all { it.isClosed(target) }
             if (opponentClosed) continue
             total += (mine - CRICKET_MARKS_TO_CLOSE) * target
+        }
+        return total
+    }
+
+    /**
+     * In cut-throat, points are received from opponents: for each OTHER player
+     * who has closed a target on which I am still open, their excess marks on
+     * that target × the target value are added to MY score (a penalty).
+     */
+    private fun cutThroatScoreFor(playerIndex: Int): Int {
+        val me = perPlayer[playerIndex]
+        var total = 0
+        for (target in CRICKET_TARGETS) {
+            if (me.isClosed(target)) continue
+            perPlayer.forEachIndexed { idx, other ->
+                if (idx == playerIndex) return@forEachIndexed
+                val theirs = other.cumulativeMarks()[target] ?: 0
+                if (theirs <= CRICKET_MARKS_TO_CLOSE) return@forEachIndexed
+                total += (theirs - CRICKET_MARKS_TO_CLOSE) * target
+            }
         }
         return total
     }
@@ -85,13 +117,19 @@ data class CricketState(
         }
         val newState = copy(perPlayer = updated)
 
-        // Win condition: all targets closed AND score >= every opponent's score.
+        // Win condition: all targets closed AND your score beats every
+        // opponent's (ties allowed). Standard wants the HIGHEST score, so you
+        // must be >= every opponent; cut-throat wants the LOWEST, so you must
+        // be <= every opponent.
         val me = updated[currentPlayerIndex]
         val newWinners = if (me.hasClosedAll()) {
             val myScore = newState.scoreFor(currentPlayerIndex)
             val leadsOrTies = updated.indices
                 .filter { it != currentPlayerIndex }
-                .all { newState.scoreFor(it) <= myScore }
+                .all {
+                    val theirScore = newState.scoreFor(it)
+                    if (cutThroat) theirScore >= myScore else theirScore <= myScore
+                }
             if (leadsOrTies) winnerIndices + currentPlayerIndex else winnerIndices
         } else winnerIndices
 
@@ -116,9 +154,13 @@ data class CricketState(
     }
 
     companion object {
-        fun new(players: List<GamePlayer>): CricketState = CricketState(
-            players = players,
-            perPlayer = players.map { CricketPlayerState(it) },
-        )
+        fun new(players: List<GamePlayer>, cutThroat: Boolean = false): CricketState {
+            require(players.isNotEmpty()) { "Cricket needs at least one player" }
+            return CricketState(
+                players = players,
+                perPlayer = players.map { CricketPlayerState(it) },
+                cutThroat = cutThroat,
+            )
+        }
     }
 }

@@ -12,11 +12,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
@@ -51,7 +55,10 @@ import com.dartrack.data.threeDartAvgTrendById
 import com.dartrack.model.Player
 
 @Composable
-fun PlayerStatsScreen(onBack: () -> Unit) {
+fun PlayerStatsScreen(
+    onBack: () -> Unit,
+    onOpenAchievements: (playerId: String) -> Unit = {},
+) {
     val context = LocalContext.current
     val gameRepo = remember { GameRepository.get(context) }
     val playerRepo = remember { PlayerRepository.get(context) }
@@ -76,6 +83,15 @@ fun PlayerStatsScreen(onBack: () -> Unit) {
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f),
             )
+            IconButton(
+                onClick = { selected?.let { onOpenAchievements(it.id) } },
+                enabled = selected != null,
+            ) {
+                Icon(
+                    Icons.Default.EmojiEvents,
+                    contentDescription = "Achievements",
+                )
+            }
             TextButton(onClick = onBack) { Text("Back") }
         }
         Spacer(Modifier.height(4.dp))
@@ -361,6 +377,23 @@ private fun ModeSummariesCard(s: PlayerStatsData) {
         }
         if (s.catch40.gamesPlayed > 0) {
             add("Catch 40" to "${s.catch40.gamesPlayed} games · wins ${s.catch40.gamesWon} · high ${s.catch40.best}")
+        }
+        if (s.countUp.gamesPlayed > 0) {
+            add("Count-Up" to "${s.countUp.gamesPlayed} games · wins ${s.countUp.gamesWon} · high ${s.countUp.best}")
+        }
+        if (s.checkoutTrainer.gamesPlayed > 0) {
+            add("Checkout Trainer" to "${s.checkoutTrainer.gamesPlayed} games · wins ${s.checkoutTrainer.gamesWon} · best ${s.checkoutTrainer.best} hits")
+        }
+        if (s.baseball.gamesPlayed > 0) {
+            add("Baseball" to "${s.baseball.gamesPlayed} games · wins ${s.baseball.gamesWon} · high ${s.baseball.best}")
+        }
+        if (s.golf.gamesPlayed > 0) {
+            // Golf is lowest-strokes; 0 means no completed result yet.
+            val best = if (s.golf.best > 0) "${s.golf.best} strokes" else "—"
+            add("Golf" to "${s.golf.gamesPlayed} games · wins ${s.golf.gamesWon} · best $best")
+        }
+        if (s.gotcha.gamesPlayed > 0) {
+            add("Gotcha" to "${s.gotcha.gamesPlayed} games · wins ${s.gotcha.gamesWon}")
         }
     }
     if (rows.isEmpty()) return
