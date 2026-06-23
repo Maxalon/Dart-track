@@ -33,16 +33,21 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dartrack.data.GameRepository
 import com.dartrack.data.Standing
+import com.dartrack.data.TBD
+import com.dartrack.data.TournamentFormat
 import com.dartrack.data.TournamentMatch
 import com.dartrack.data.TournamentRepository
 import com.dartrack.data.TournamentState
+import com.dartrack.data.bracketChampion
 import com.dartrack.data.buildMatchGameRecord
 import com.dartrack.data.champions
 import com.dartrack.data.isComplete
 import com.dartrack.data.linkMatchGame
 import com.dartrack.data.matchGameId
+import com.dartrack.data.nextPlayableBracketMatch
 import com.dartrack.data.nextUnplayedMatch
 import com.dartrack.data.standings
+import com.dartrack.data.syncedBracketWith
 import com.dartrack.data.syncedWith
 import kotlinx.coroutines.launch
 
@@ -77,10 +82,15 @@ fun TournamentDetailScreen(
     val tournament = tournaments.firstOrNull { it.id == tournamentId }
 
     // Fold any finished, linked games back into the tournament. Only persist when
-    // the sync actually changed something so we don't loop on a stable state.
+    // the sync actually changed something so we don't loop on a stable state. A
+    // knockout advances its tree via syncedBracketWith; a league uses syncedWith.
     LaunchedEffect(games, tournamentId) {
         val current = tournaments.firstOrNull { it.id == tournamentId } ?: return@LaunchedEffect
-        val synced = current.syncedWith(games)
+        val synced = if (current.format == TournamentFormat.SINGLE_ELIMINATION) {
+            current.syncedBracketWith(games)
+        } else {
+            current.syncedWith(games)
+        }
         if (synced != current) scope.launch { tournamentRepo.upsert(synced) }
     }
 
@@ -135,33 +145,35 @@ fun TournamentDetailScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
-            if (isComplete(tournament)) {
-                val names = champions(tournament).joinToString(" · ") {
+            if (tournament.format == TournamentFormat.SINGLE_ELIMINATION) {
+                // Knockout: champion is the final's winner; the bracket view owns
+                // its own "Play next match" (no league standings/fixtures).
+                val championName = bracketChampion(tournament)?.let {
                     tournament.competitors[it].name
                 }
-                Card(
-                    modifier = Modifier.fillMaxWidth().padding(8.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    ),
-                ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Text("🏆 Champion", fontWeight = FontWeight.Bold)
-                        Text(names, fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
+                if (championName != null) {
+                    ChampionBanner(championName)
+                }
+                BracketView(tournament, onPlay = play)
+            } else {
+                if (isComplete(tournament)) {
+                    val names = champions(tournament).joinToString(" · ") {
+                        tournament.competitors[it].name
+                    }
+                    ChampionBanner(names)
+                } else {
+                    val next = nextUnplayedMatch(tournament)
+                    if (next != null) {
+                        OutlinedButton(
+                            onClick = { play(next) },
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                        ) { Text("Play next match") }
                     }
                 }
-            } else {
-                val next = nextUnplayedMatch(tournament)
-                if (next != null) {
-                    OutlinedButton(
-                        onClick = { play(next) },
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
-                    ) { Text("Play next match") }
-                }
-            }
 
-            StandingsCard(tournament)
-            FixturesCard(tournament, onPlay = play)
+                StandingsCard(tournament)
+                FixturesCard(tournament, onPlay = play)
+            }
             Spacer(Modifier.height(16.dp))
         }
     }
@@ -266,4 +278,114 @@ private fun FixtureRow(
             TextButton(onClick = { onPlay(match) }) { Text(label) }
         }
     }
+}
+
+/** The shared "🏆 Champion" banner Card used by both formats once a winner exists. */
+@Composable
+private fun ChampionBanner(names: String) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+        ),
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text("🏆 Champion", fontWeight = FontWeight.Bold)
+            Text(names, fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
+        }
+    }
+}
+
+/**
+ * Knockout bracket view: a "Play next match" shortcut over the first playable match
+ * ([nextPlayableBracketMatch]) followed by every match grouped by [TournamentMatch.round]
+ * (ascending). Each round gets a header — "Final" for the last round, else "Round N" —
+ * and each match is a [BracketMatchRow]. Mirrors the Card styling of the league's
+ * FixturesCard and the screen's Play/Resume flow.
+ */
+@Composable
+private fun BracketView(
+    tournament: TournamentState,
+    onPlay: (TournamentMatch) -> Unit,
+) {
+    val next = nextPlayableBracketMatch(tournament)
+    if (next != null) {
+        OutlinedButton(
+            onClick = { onPlay(next) },
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+        ) { Text("Play next match") }
+    }
+
+    Card(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(
+                "Bracket",
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            // Matches are emitted in round order (round 1 first); group them so each
+            // round gets a header. The map preserves insertion (round) order.
+            val byRound = tournament.matches.groupBy { it.round }
+            val lastRound = byRound.keys.maxOrNull()
+            byRound.forEach { (round, matches) ->
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    if (round == lastRound) "Final" else "Round $round",
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                matches.forEach { match ->
+                    BracketMatchRow(match, tournament, onPlay)
+                }
+            }
+        }
+    }
+}
+
+/**
+ * One bracket match: its two slots (a [TBD] slot reads "TBD", else the competitor's
+ * name, with the winner marked once [TournamentMatch.played]) and — only when BOTH
+ * slots are real competitors and the match is unplayed — a Play/Resume button. A
+ * match still awaiting a feeder ([TBD] on either side) shows no action.
+ */
+@Composable
+private fun BracketMatchRow(
+    match: TournamentMatch,
+    tournament: TournamentState,
+    onPlay: (TournamentMatch) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            BracketSlot(match.homeIndex, match, tournament)
+            BracketSlot(match.awayIndex, match, tournament)
+        }
+        val bothReal = match.homeIndex != TBD && match.awayIndex != TBD
+        if (!match.played && bothReal) {
+            // "Resume" once a game has been created for this match, else "Play".
+            val label = if (match.gameId != null) "Resume" else "Play"
+            TextButton(onClick = { onPlay(match) }) { Text(label) }
+        }
+    }
+}
+
+/**
+ * A single bracket slot for competitor [index] in [match]: "TBD" when the slot is
+ * still an unresolved feeder ([index] == [TBD]), otherwise the competitor's name.
+ * The slot is bold and prefixed "✓" when it is the played match's winner.
+ */
+@Composable
+private fun BracketSlot(index: Int, match: TournamentMatch, tournament: TournamentState) {
+    if (index == TBD) {
+        Text("TBD", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        return
+    }
+    val isWinner = match.played && match.winnerIndex == index
+    Text(
+        (if (isWinner) "✓ " else "") + tournament.competitors[index].name,
+        fontWeight = if (isWinner) FontWeight.Bold else FontWeight.Normal,
+    )
 }

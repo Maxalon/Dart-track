@@ -43,7 +43,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dartrack.data.PlayerRepository
 import com.dartrack.data.TournamentCompetitor
+import com.dartrack.data.TournamentFormat
 import com.dartrack.data.TournamentRepository
+import com.dartrack.data.createSingleEliminationTournament
 import com.dartrack.data.createTournament
 import com.dartrack.data.fillWithCpus
 import com.dartrack.model.GameMode
@@ -80,6 +82,8 @@ fun NewTournamentScreen(
 
     var name by remember { mutableStateOf("") }
     var mode by remember { mutableStateOf(GameMode.X01) }
+    // Round-robin (every pairing once) vs single-elimination knockout bracket.
+    var format by remember { mutableStateOf(TournamentFormat.ROUND_ROBIN) }
     // The competitors built so far, in pick order. CPUs cycle through BotLevel as
     // they are added so a quick "Add CPU" gives a believable mixed field.
     val competitors = remember { mutableStateListOf<TournamentCompetitor>() }
@@ -108,6 +112,21 @@ fun NewTournamentScreen(
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
+
+        Spacer(Modifier.height(16.dp))
+        Text("Format", fontWeight = FontWeight.SemiBold)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(
+                selected = format == TournamentFormat.ROUND_ROBIN,
+                onClick = { format = TournamentFormat.ROUND_ROBIN },
+                label = { Text("Round robin") },
+            )
+            FilterChip(
+                selected = format == TournamentFormat.SINGLE_ELIMINATION,
+                onClick = { format = TournamentFormat.SINGLE_ELIMINATION },
+                label = { Text("Knockout") },
+            )
+        }
 
         Spacer(Modifier.height(16.dp))
         Text("Mode", fontWeight = FontWeight.SemiBold)
@@ -238,13 +257,24 @@ fun NewTournamentScreen(
             OutlinedButton(onClick = onCancel) { Text("Cancel") }
             Button(
                 onClick = {
-                    val t = createTournament(
-                        id = UUID.randomUUID().toString(),
-                        name = name.trim(),
-                        competitors = competitors.toList(),
-                        mode = mode,
-                        createdAtEpochMs = System.currentTimeMillis(),
-                    )
+                    val id = UUID.randomUUID().toString()
+                    val t = if (format == TournamentFormat.SINGLE_ELIMINATION) {
+                        createSingleEliminationTournament(
+                            id = id,
+                            name = name.trim(),
+                            competitors = competitors.toList(),
+                            mode = mode,
+                            createdAtEpochMs = System.currentTimeMillis(),
+                        )
+                    } else {
+                        createTournament(
+                            id = id,
+                            name = name.trim(),
+                            competitors = competitors.toList(),
+                            mode = mode,
+                            createdAtEpochMs = System.currentTimeMillis(),
+                        )
+                    }
                     scope.launch {
                         tournamentRepo.upsert(t)
                         onCreated(t.id)
