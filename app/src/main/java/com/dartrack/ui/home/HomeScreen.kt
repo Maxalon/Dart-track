@@ -36,6 +36,7 @@ fun HomeScreen(
     onStats: () -> Unit,
     onPlayerStats: () -> Unit,
     onLeaderboards: () -> Unit,
+    onTournaments: () -> Unit,
     onManagePlayers: () -> Unit,
     onSettings: () -> Unit,
     onHowToPlay: () -> Unit,
@@ -98,6 +99,10 @@ fun HomeScreen(
             Spacer(Modifier.height(12.dp))
             OutlinedButton(onClick = onLeaderboards, modifier = Modifier.fillMaxWidth()) {
                 Text("Leaderboards")
+            }
+            Spacer(Modifier.height(12.dp))
+            OutlinedButton(onClick = onTournaments, modifier = Modifier.fillMaxWidth()) {
+                Text("Tournaments")
             }
             Spacer(Modifier.height(12.dp))
             OutlinedButton(onClick = onManagePlayers, modifier = Modifier.fillMaxWidth()) {

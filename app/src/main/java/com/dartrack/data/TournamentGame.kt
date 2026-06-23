@@ -132,3 +132,27 @@ fun TournamentState.syncedWith(games: List<GameRecord>): TournamentState {
         reconcileMatch(acc, match.id, game)
     }
 }
+
+/**
+ * The deterministic game id for a tournament match: `"tour-<tournamentId>-<matchId>"`.
+ *
+ * Because both ids are stable for the life of the tournament, the same match
+ * always maps to the same game id — so the UI can create, resume and reconcile a
+ * match's game from its match alone, with no extra id bookkeeping to persist.
+ * Pure.
+ */
+fun matchGameId(tournamentId: String, matchId: String): String = "tour-$tournamentId-$matchId"
+
+/**
+ * Return [state] with match [matchId]'s [TournamentMatch.gameId] set to [gameId],
+ * leaving its [TournamentMatch.played] / [TournamentMatch.winnerIndex] untouched
+ * (linking a game is separate from recording its result). A no-op (state returned
+ * unchanged) when [matchId] is absent. Pure.
+ */
+fun linkMatchGame(state: TournamentState, matchId: String, gameId: String): TournamentState {
+    val idx = state.matches.indexOfFirst { it.id == matchId }
+    if (idx < 0) return state // unknown match -> no-op
+    val updated = state.matches[idx].copy(gameId = gameId)
+    val newMatches = state.matches.toMutableList().also { it[idx] = updated }
+    return state.copy(matches = newMatches)
+}

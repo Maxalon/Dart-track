@@ -328,4 +328,51 @@ class TournamentGameTest {
         val linked = t.copy(matches = listOf(t.matches.single().copy(gameId = "g-1")))
         assertEquals(linked, linked.syncedWith(emptyList()), "no games -> unchanged")
     }
+
+    // ---- matchGameId / linkMatchGame ----------------------------------------
+
+    @Test
+    fun matchGameId_isDeterministicAndScopedToBothIds() {
+        val t = twoUpTournament()
+        val match = t.matches.single()
+        val gid = matchGameId(t.id, match.id)
+        assertEquals("tour-t1-m-0-0-1", gid, "id is tour-<tournamentId>-<matchId>")
+        assertEquals(gid, matchGameId(t.id, match.id), "same inputs -> same id (deterministic)")
+        // Different tournament or match changes the id.
+        assertTrue(matchGameId("other", match.id) != gid, "tournament id is part of the key")
+        assertTrue(matchGameId(t.id, "m-9-9-9") != gid, "match id is part of the key")
+    }
+
+    @Test
+    fun linkMatchGame_setsGameIdWithoutRecordingResult() {
+        val t = twoUpTournament()
+        val match = t.matches.single()
+        val gid = matchGameId(t.id, match.id)
+
+        val out = linkMatchGame(t, match.id, gid)
+        val linked = out.matches.single()
+        assertEquals(gid, linked.gameId, "the match's gameId is set")
+        assertFalse(linked.played, "linking does not mark the match played")
+        assertNull(linked.winnerIndex, "linking leaves the winner untouched")
+    }
+
+    @Test
+    fun linkMatchGame_preservesExistingResult() {
+        // A played match keeps its played/winner when re-linked to a game id.
+        val t = twoUpTournament()
+        val recorded = recordResult(t, t.matches.single().id, t.matches.single().homeIndex, null)
+        val gid = matchGameId(t.id, recorded.matches.single().id)
+
+        val out = linkMatchGame(recorded, recorded.matches.single().id, gid)
+        val m = out.matches.single()
+        assertEquals(gid, m.gameId, "gameId is updated")
+        assertTrue(m.played, "played flag is preserved")
+        assertEquals(recorded.matches.single().homeIndex, m.winnerIndex, "winner is preserved")
+    }
+
+    @Test
+    fun linkMatchGame_unknownMatchId_isNoOp() {
+        val t = twoUpTournament()
+        assertEquals(t, linkMatchGame(t, "no-such-match", "g-x"), "unknown matchId -> unchanged")
+    }
 }

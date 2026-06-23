@@ -43,6 +43,9 @@ import com.dartrack.ui.settings.SettingsScreen
 import com.dartrack.ui.setup.NewGameScreen
 import com.dartrack.ui.stats.PlayerStatsScreen
 import com.dartrack.ui.stats.StatsScreen
+import com.dartrack.ui.tournament.NewTournamentScreen
+import com.dartrack.ui.tournament.TournamentDetailScreen
+import com.dartrack.ui.tournament.TournamentsScreen
 import com.dartrack.viewmodel.AppViewModel
 import com.dartrack.viewmodel.SettingsViewModel
 
@@ -95,6 +98,7 @@ fun AppRoot() {
                 onStats = { nav.navigate("stats") },
                 onPlayerStats = { nav.navigate("player_stats") },
                 onLeaderboards = { nav.navigate("leaderboards") },
+                onTournaments = { nav.navigate("tournaments") },
                 onManagePlayers = { nav.navigate("players") },
                 onSettings = { nav.navigate("settings") },
                 onHowToPlay = { nav.navigate("how_to_play") },
@@ -205,6 +209,31 @@ fun AppRoot() {
         }
         composable("leaderboards") {
             LeaderboardsScreen(onBack = { nav.popBackStack() })
+        }
+        composable("tournaments") {
+            TournamentsScreen(
+                onBack = { nav.popBackStack() },
+                onNew = { nav.navigate("new_tournament") },
+                onOpen = { id -> nav.navigate("tournament/$id") },
+            )
+        }
+        composable("new_tournament") {
+            NewTournamentScreen(
+                onCancel = { nav.popBackStack() },
+                onCreated = { id ->
+                    nav.navigate("tournament/$id") {
+                        popUpTo("tournaments")
+                    }
+                },
+            )
+        }
+        composable("tournament/{id}") { backstack ->
+            val id = backstack.arguments?.getString("id") ?: return@composable
+            TournamentDetailScreen(
+                tournamentId = id,
+                onBack = { nav.popBackStack() },
+                onPlayMatch = { gid -> nav.navigate("game/$gid") },
+            )
         }
         composable("how_to_play") {
             HowToPlayScreen(onBack = { nav.popBackStack() })
