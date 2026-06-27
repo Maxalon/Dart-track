@@ -292,6 +292,10 @@ fun KillerScreen(
                                     else MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         val v = pending[seat] ?: 0
+                        // An eliminated opponent can't lose more lives, so its row
+                        // is inert; the active player's own row is never eliminated
+                        // (eliminated seats are skipped), so it always stays usable.
+                        val rowUsable = isMe || !ps.isEliminated
                         OutlinedButton(
                             onClick = { if (v > 0) pending[seat] = v - 1 },
                             enabled = v > 0,
@@ -305,9 +309,9 @@ fun KillerScreen(
                         )
                         Button(
                             onClick = {
-                                if (pendingTotal < KILLER_MAX_DARTS) pending[seat] = v + 1
+                                if (pendingTotal < KILLER_MAX_DARTS && rowUsable) pending[seat] = v + 1
                             },
-                            enabled = pendingTotal < KILLER_MAX_DARTS,
+                            enabled = pendingTotal < KILLER_MAX_DARTS && rowUsable,
                         ) { Text("+") }
                     }
                 }

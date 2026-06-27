@@ -28,7 +28,10 @@ import kotlinx.serialization.Serializable
  *
  * Lives are floored at 0; a player at 0 lives is ELIMINATED and is skipped when
  * advancing turns. After a turn, if only one player remains alive the game ends
- * and that player is the winner. applyTurn is a no-op once finished.
+ * and that player is the winner; if a single visit wipes out everyone still in it
+ * (an armed player self-killing their last life as they drain the last opponent),
+ * the game ends in a DRAW between the players who were alive going into that turn.
+ * applyTurn is a no-op once finished.
  *
  * Undo is implemented by REPLAY: the full ordered [turns] history is stored and
  * undoLast() drops the last turn then folds applyTurn over the survivors from a
@@ -131,13 +134,21 @@ data class KillerState(
         }
         val history = turns + KillerTurn(actorIndex = p, hits = hits)
 
-        // Win check: a clean Killer end leaves exactly one alive player.
+        // Win check: a clean Killer end leaves exactly one alive player. A turn can
+        // also eliminate EVERYONE at once — an armed player self-killing their own
+        // last life on the very visit that drains the last opponent to 0 — which is
+        // a DRAW between the players who were still alive going into this turn (they
+        // fell together). Using winnerIndices for the draw keeps isFinished true so
+        // the game can never get stuck on a board where no one has lives.
         val alive = updated.withIndex().filter { it.value.lives > 0 }.map { it.index }
         if (players.size > 1 && alive.size <= 1) {
+            val winners = alive.ifEmpty {
+                perPlayer.withIndex().filter { it.value.lives > 0 }.map { it.index }
+            }
             return copy(
                 perPlayer = updated,
                 turns = history,
-                winnerIndices = alive,
+                winnerIndices = winners,
             )
         }
 

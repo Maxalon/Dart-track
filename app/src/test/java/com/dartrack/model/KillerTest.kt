@@ -253,6 +253,39 @@ class KillerTest {
         assertEquals(3, s.aliveCount)
     }
 
+    @Test
+    fun mutualElimination_endsAsDrawBetweenLastTwo_neverStuck() {
+        // 2 players, 1 life each, both armed. A then self-kills (own) on the same
+        // visit it drains B's last life (opp) -> both reach 0 at once -> draw.
+        var s = game(1, "A", "B")
+        s = s.applyTurn(listOf(0))   // A -> killer
+        s = s.applyTurn(listOf(1))   // B -> killer
+        // A is armed at turn start; [own, opp] = self-kill A to 0 AND kill B to 0.
+        s = s.applyTurn(listOf(0, 1))
+        assertEquals(0, s.perPlayer[0].lives)
+        assertEquals(0, s.perPlayer[1].lives)
+        assertEquals(0, s.aliveCount)
+        assertTrue(s.isFinished, "a 0-alive board must still be a finished game, not stuck")
+        assertEquals(listOf(0, 1), s.winnerIndices, "mutual elimination is a draw between both")
+        assertEquals(s, s.applyTurn(listOf(0)), "finished game ignores further turns")
+    }
+
+    @Test
+    fun mutualElimination_isUndoable() {
+        var s = game(1, "A", "B")
+        s = s.applyTurn(listOf(0))
+        s = s.applyTurn(listOf(1))
+        val preFinish = s
+        s = s.applyTurn(listOf(0, 1))
+        assertTrue(s.isFinished)
+        val undone = s.undoLast()
+        assertFalse(undone.isFinished, "draw undone")
+        assertTrue(undone.winnerIndices.isEmpty())
+        assertEquals(preFinish.perPlayer.map { it.lives }, undone.perPlayer.map { it.lives })
+        assertEquals(1, undone.perPlayer[0].lives)
+        assertEquals(1, undone.perPlayer[1].lives)
+    }
+
     // ------------------------------------------------------------------ undo
 
     @Test
