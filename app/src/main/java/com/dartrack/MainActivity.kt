@@ -8,11 +8,13 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.lifecycleScope
 import com.dartrack.data.SettingsRepository
+import com.dartrack.feedback.GameFeedback
 import com.dartrack.ui.AppRoot
 import com.dartrack.ui.theme.DartTrackTheme
 import kotlinx.coroutines.launch
@@ -34,8 +36,19 @@ class MainActivity : ComponentActivity() {
         val settingsRepo = SettingsRepository.get(this)
         lifecycleScope.launch { settingsRepo.load() }
 
+        // Build the in-game sound/haptic engine once for the whole process; the
+        // view-model plays through it. It stays inert until a turn is taken AND
+        // the user has the channels enabled (synced from settings below).
+        GameFeedback.init(this)
+
         setContent {
             val settings by settingsRepo.settings.collectAsState()
+
+            // Keep the feedback engine's channels in sync with the user's prefs.
+            LaunchedEffect(settings.soundEffects, settings.haptics) {
+                GameFeedback.soundOn = settings.soundEffects
+                GameFeedback.hapticsOn = settings.haptics
+            }
 
             // Keep-screen-on: toggle the window flag to match the setting while
             // this composition is active; clear it on dispose so it never leaks.
