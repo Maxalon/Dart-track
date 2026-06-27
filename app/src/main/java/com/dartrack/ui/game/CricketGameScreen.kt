@@ -37,7 +37,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -72,7 +71,7 @@ fun CricketGameScreen(
     val canConfirm = !state.isFinished
 
     val caller = rememberCaller()
-    var callerOn by rememberSaveable { mutableStateOf(false) }
+    var callerOn by rememberCallerOnDefault()
 
     // Announce a Cricket turn. The win outcome is computed by running the model's
     // own pure applyTurn (which returns a new state and does not mutate anything)

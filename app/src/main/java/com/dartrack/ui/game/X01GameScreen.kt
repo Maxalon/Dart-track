@@ -29,7 +29,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -67,7 +66,7 @@ fun X01GameScreen(
         state.players.getOrNull(state.currentPlayerIndex)?.isBot == true
 
     val caller = rememberCaller()
-    var callerOn by rememberSaveable { mutableStateOf(false) }
+    var callerOn by rememberCallerOnDefault()
 
     // Announce an X01 turn. Outcome is derived from the same pure rules the model
     // uses (see X01State.applyTurn) without mutating any state.

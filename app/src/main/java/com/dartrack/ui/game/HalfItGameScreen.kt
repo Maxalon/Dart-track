@@ -30,7 +30,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -67,7 +66,7 @@ fun HalfItGameScreen(
     val maxValue = maxValueForTarget(target)
 
     val caller = rememberCaller()
-    var callerOn by rememberSaveable { mutableStateOf(false) }
+    var callerOn by rememberCallerOnDefault()
 
     // Announce a Half-It round: the points scored, or "Halved" when nothing
     // was hit (which halves the running total per HalfItState.applyTurn).
