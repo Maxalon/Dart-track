@@ -365,6 +365,9 @@ private fun ModeSummariesCard(s: PlayerStatsData) {
         if (s.halfIt.gamesPlayed > 0) {
             add("Half-It" to "${s.halfIt.gamesPlayed} games · wins ${s.halfIt.gamesWon} · high ${s.halfIt.best}")
         }
+        if (s.bermuda.gamesPlayed > 0) {
+            add("Bermuda" to "${s.bermuda.gamesPlayed} games · best ${s.bermuda.best}")
+        }
         if (s.aroundTheClock.gamesPlayed > 0) {
             val best = if (s.aroundTheClock.best > 0) "${s.aroundTheClock.best} darts" else "—"
             add("Around the Clock" to "${s.aroundTheClock.gamesPlayed} games · wins ${s.aroundTheClock.gamesWon} · best $best")
@@ -394,6 +397,9 @@ private fun ModeSummariesCard(s: PlayerStatsData) {
         }
         if (s.gotcha.gamesPlayed > 0) {
             add("Gotcha" to "${s.gotcha.gamesPlayed} games · wins ${s.gotcha.gamesWon}")
+        }
+        if (s.killer.gamesPlayed > 0) {
+            add("Killer" to "${s.killer.gamesPlayed} games · wins ${s.killer.gamesWon}")
         }
     }
     if (rows.isEmpty()) return

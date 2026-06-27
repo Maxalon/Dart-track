@@ -2,6 +2,7 @@ package com.dartrack.data
 
 import com.dartrack.model.AroundTheClockState
 import com.dartrack.model.BaseballState
+import com.dartrack.model.BermudaState
 import com.dartrack.model.BobsTwentySevenState
 import com.dartrack.model.Catch40State
 import com.dartrack.model.CheckoutTrainerState
@@ -13,6 +14,7 @@ import com.dartrack.model.GolfResult
 import com.dartrack.model.GolfState
 import com.dartrack.model.GotchaState
 import com.dartrack.model.HalfItState
+import com.dartrack.model.KillerState
 import com.dartrack.model.ShanghaiState
 import com.dartrack.model.X01State
 import kotlin.test.Test
@@ -21,7 +23,7 @@ import kotlin.test.assertTrue
 
 /**
  * ADVERSARIAL persistence test: a [GameStore] holding ONE game of EVERY one of
- * the 12 [GameMode]s must encode then decode to an EQUAL list. This is the
+ * the 14 [GameMode]s must encode then decode to an EQUAL list. This is the
  * catch-all guard for the polymorphic [com.dartrack.model.GameState] registry —
  * a missing sealed subtype registration or a duplicate @SerialName would surface
  * here as a decode failure (which [decodeGameStore] silently wipes to empty) or
@@ -62,6 +64,10 @@ class AllModesStoreRoundTripTest {
                 GolfState.new(players).applyResult(GolfResult.TRIPLE)),
             rec("gotcha", GameMode.GOTCHA,
                 GotchaState.new(players, target = 501).applyTurn(140)),
+            rec("killer", GameMode.KILLER,
+                KillerState.new(players).applyTurn(listOf(0))),
+            rec("bermuda", GameMode.BERMUDA,
+                BermudaState.new(players).applyTurn(36)),
         )
     }
 
@@ -74,7 +80,7 @@ class AllModesStoreRoundTripTest {
             records.map { it.mode }.toSet(),
             "fixture must include every GameMode exactly once",
         )
-        assertEquals(GameMode.entries.size, records.size, "exactly 12 modes")
+        assertEquals(GameMode.entries.size, records.size, "exactly 14 modes")
 
         val text = encodeGameStore(records)
         val decoded = decodeGameStore(text)
@@ -89,10 +95,11 @@ class AllModesStoreRoundTripTest {
     fun everyModeSerialName_isPresentAndDistinct() {
         // Each state must serialize under a UNIQUE "type" discriminator. Collisions
         // would silently misroute on decode; assert the set of discriminators has
-        // size 12 and matches the expected serial names.
+        // size 14 and matches the expected serial names.
         val expected = setOf(
             "x01", "cricket", "halfit", "around_clock", "bobs_27", "shanghai",
             "catch_40", "count_up", "checkout_trainer", "baseball", "golf", "gotcha",
+            "killer", "bermuda",
         )
         val seen = mutableSetOf<String>()
         for (r in oneOfEveryMode()) {
@@ -102,7 +109,7 @@ class AllModesStoreRoundTripTest {
             val name = m!!.groupValues[1]
             assertTrue(seen.add(name), "duplicate @SerialName '$name' across modes")
         }
-        assertEquals(12, seen.size, "expected 12 distinct serial names, got $seen")
+        assertEquals(14, seen.size, "expected 14 distinct serial names, got $seen")
         assertEquals(expected, seen, "serial-name set drifted: $seen")
     }
 
@@ -115,6 +122,6 @@ class AllModesStoreRoundTripTest {
             text.contains("\"schemaVersion\":${GameStore.SCHEMA_VERSION}"),
             "current schema marker expected",
         )
-        assertEquals(12, decodeGameStore(text).size, "all 12 modes load through the wipe guard")
+        assertEquals(14, decodeGameStore(text).size, "all 14 modes load through the wipe guard")
     }
 }

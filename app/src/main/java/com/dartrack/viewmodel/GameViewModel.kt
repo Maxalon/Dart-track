@@ -10,6 +10,7 @@ import com.dartrack.model.GamePlayer
 import com.dartrack.model.GameState
 import com.dartrack.model.AroundTheClockState
 import com.dartrack.model.BaseballState
+import com.dartrack.model.BermudaState
 import com.dartrack.model.BobsTwentySevenState
 import com.dartrack.model.Catch40State
 import com.dartrack.model.CountUpState
@@ -19,10 +20,13 @@ import com.dartrack.model.GolfResult
 import com.dartrack.model.GolfState
 import com.dartrack.model.GotchaState
 import com.dartrack.model.HalfItState
+import com.dartrack.model.KillerState
 import com.dartrack.model.ShanghaiState
 import com.dartrack.model.X01State
 import com.dartrack.model.bot.BotLevel
 import com.dartrack.model.bot.DartsBot
+import com.dartrack.feedback.GameFeedback
+import com.dartrack.feedback.feedbackEventFor
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -74,6 +78,10 @@ class GameViewModel(
         )
         _record.value = updated
         viewModelScope.launch { repo.upsert(updated) }
+        // Audio/haptic feedback for the transition (human or bot), routed through
+        // one place so every mode is covered. No-op until MainActivity initialises
+        // GameFeedback and the user has sound/haptics enabled.
+        feedbackEventFor(cur.state, newState)?.let { GameFeedback.play(it) }
         // Every applied turn (human or bot) may hand the turn to a CPU seat.
         maybeStartBotTurns()
     }
@@ -212,6 +220,14 @@ class GameViewModel(
         mutate { (it as GotchaState).applyTurn(total) }
 
     fun undoGotcha() = mutate { (it as GotchaState).undoLast() }
+
+    fun applyKillerTurn(hits: List<Int>) = mutate { (it as KillerState).applyTurn(hits) }
+
+    fun undoKiller() = mutate { (it as KillerState).undoLast() }
+
+    fun applyBermudaTurn(points: Int) = mutate { (it as BermudaState).applyTurn(points) }
+
+    fun undoBermuda() = mutate { (it as BermudaState).undoLast() }
 
     class Factory(
         private val repo: GameRepository,

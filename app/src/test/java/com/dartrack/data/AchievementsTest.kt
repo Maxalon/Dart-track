@@ -2,8 +2,10 @@ package com.dartrack.data
 
 import com.dartrack.model.AroundTheClockState
 import com.dartrack.model.BaseballState
+import com.dartrack.model.BermudaState
 import com.dartrack.model.CheckoutTrainerState
 import com.dartrack.model.CountUpState
+import com.dartrack.model.CricketState
 import com.dartrack.model.GOLF_HOLES
 import com.dartrack.model.GameMode
 import com.dartrack.model.GamePlayer
@@ -11,6 +13,7 @@ import com.dartrack.model.GolfResult
 import com.dartrack.model.GolfState
 import com.dartrack.model.GotchaState
 import com.dartrack.model.HalfItState
+import com.dartrack.model.KillerState
 import com.dartrack.model.ShanghaiState
 import com.dartrack.model.X01PlayerState
 import com.dartrack.model.X01State
@@ -509,6 +512,162 @@ class AchievementsTest {
         assertFalse(state.isFinished, "still short of target")
         val g = GameRecord("r1", GameMode.GOTCHA, 0L, 0L, state)
         assertFalse(status("gotcha_winner", listOf(g)).unlocked, "no win -> locked")
+    }
+
+    // ---- cricket_winner -----------------------------------------------------
+
+    @Test
+    fun cricketWinner_closingEveryTarget() {
+        // Single seat: close all 7 targets (3 marks each) -> sole winner.
+        val player = GamePlayer(name = NAME, id = PID)
+        var state = CricketState.new(listOf(player))
+        for (target in com.dartrack.model.CRICKET_TARGETS) {
+            state = state.applyTurn(mapOf(target to 3))
+        }
+        assertTrue(state.isFinished, "all targets closed -> winner")
+        assertTrue(state.winnerIndices.contains(0))
+        val g = GameRecord("r1", GameMode.CRICKET, 30L, 30L, state)
+        val s = status("cricket_winner", listOf(g))
+        assertTrue(s.unlocked, "winning Cricket unlocks the achievement")
+        assertEquals(30L, s.unlockedAtMs)
+    }
+
+    @Test
+    fun cricketWinner_lockedWhenNotWon() {
+        // Only one target closed -> game not finished, no win -> locked.
+        val player = GamePlayer(name = NAME, id = PID)
+        var state = CricketState.new(listOf(player))
+        state = state.applyTurn(mapOf(20 to 3))
+        assertFalse(state.isFinished, "board not cleared")
+        val g = GameRecord("r1", GameMode.CRICKET, 0L, 0L, state)
+        assertFalse(status("cricket_winner", listOf(g)).unlocked, "no win -> locked")
+    }
+
+    // ---- half_it_winner -----------------------------------------------------
+
+    @Test
+    fun halfItWinner_winningTheGame() {
+        // Single seat: play all 9 rounds (sole player always wins on the last).
+        val player = GamePlayer(name = NAME, id = PID)
+        var state = HalfItState.new(listOf(player))
+        repeat(com.dartrack.model.HALF_IT_ROUNDS.size) { state = state.applyTurn(30) }
+        assertTrue(state.isFinished, "all rounds played -> winner")
+        assertTrue(state.winnerIndices.contains(0))
+        val g = GameRecord("r1", GameMode.HALF_IT, 31L, 31L, state)
+        val s = status("half_it_winner", listOf(g))
+        assertTrue(s.unlocked, "winning Half-It unlocks the achievement")
+        assertEquals(31L, s.unlockedAtMs)
+    }
+
+    @Test
+    fun halfItWinner_lockedWhenNotFinished() {
+        // A single round played -> game unfinished, no winner -> locked.
+        val player = GamePlayer(name = NAME, id = PID)
+        var state = HalfItState.new(listOf(player))
+        state = state.applyTurn(30)
+        assertFalse(state.isFinished, "rounds remain")
+        val g = GameRecord("r1", GameMode.HALF_IT, 0L, 0L, state)
+        assertFalse(status("half_it_winner", listOf(g)).unlocked, "no win -> locked")
+    }
+
+    // ---- killer_untouchable -------------------------------------------------
+
+    @Test
+    fun killerUntouchable_winWithoutLosingALife() {
+        // Two-seat Killer, default 3 lives. Seat 0 promotes and drains seat 1 to 0
+        // while seat 1 never lands a damaging dart -> seat 0 wins with full lives.
+        val p0 = GamePlayer(name = NAME, id = PID)
+        val p1 = GamePlayer(name = "Bob", id = "p-2")
+        var state = KillerState.new(listOf(p0, p1))
+        state = state.applyTurn(listOf(0, 1, 1)) // promote, seat1 3 -> 1
+        state = state.applyTurn(emptyList())      // seat 1 does nothing
+        state = state.applyTurn(listOf(1))        // seat1 1 -> 0, seat 0 wins
+        assertTrue(state.isFinished, "one player left -> finished")
+        assertEquals(listOf(0), state.winnerIndices, "sole winner is seat 0")
+        assertEquals(state.startLives, state.perPlayer[0].lives, "seat 0 kept all lives")
+        val g = GameRecord("r1", GameMode.KILLER, 40L, 40L, state)
+        val all = achievementsFor(PID, listOf(g))
+        assertTrue(all.byId("killer_winner").unlocked, "won Killer")
+        assertTrue(all.byId("killer_untouchable").unlocked, "won without losing a life")
+        assertEquals(40L, all.byId("killer_untouchable").unlockedAtMs)
+    }
+
+    @Test
+    fun killerUntouchable_lockedWhenALifeIsLost() {
+        // Same shape but seat 0 self-kills along the way, finishing below startLives:
+        // killer_winner unlocks, killer_untouchable stays locked.
+        val p0 = GamePlayer(name = NAME, id = PID)
+        val p1 = GamePlayer(name = "Bob", id = "p-2")
+        var state = KillerState.new(listOf(p0, p1))
+        state = state.applyTurn(listOf(0, 1)) // promote, seat1 3 -> 2
+        state = state.applyTurn(emptyList())
+        state = state.applyTurn(listOf(0, 1)) // self-kill (3 -> 2), seat1 2 -> 1
+        state = state.applyTurn(emptyList())
+        state = state.applyTurn(listOf(1))     // seat1 1 -> 0, seat 0 wins
+        assertTrue(state.isFinished)
+        assertEquals(listOf(0), state.winnerIndices, "sole winner is seat 0")
+        assertTrue(state.perPlayer[0].lives < state.startLives, "seat 0 lost a life")
+        val g = GameRecord("r1", GameMode.KILLER, 0L, 0L, state)
+        val all = achievementsFor(PID, listOf(g))
+        assertTrue(all.byId("killer_winner").unlocked, "still a Killer win")
+        assertFalse(all.byId("killer_untouchable").unlocked, "a life was lost -> locked")
+    }
+
+    // ---- bermuda_treasure ---------------------------------------------------
+
+    @Test
+    fun bermudaTreasure_reachingTwoFiftyOrMore() {
+        // Single seat scoring 60 every round -> final total 720 >= 250.
+        val player = GamePlayer(name = NAME, id = PID)
+        var state = BermudaState.new(listOf(player))
+        repeat(com.dartrack.model.BERMUDA_ROUNDS.size) { state = state.applyTurn(60) }
+        assertTrue(state.isFinished, "all rounds played -> finished")
+        assertTrue(state.perPlayer[0].total >= 250, "sanity: total clears the bar")
+        val g = GameRecord("r1", GameMode.BERMUDA, 41L, 41L, state)
+        val s = status("bermuda_treasure", listOf(g))
+        assertTrue(s.unlocked, "250+ total unlocks treasure hunter")
+        assertEquals(41L, s.unlockedAtMs)
+    }
+
+    @Test
+    fun bermudaTreasure_lockedAtTwoFortyNine() {
+        // Score 20 for 11 rounds (=220) + 29 in the last -> final total 249 < 250.
+        val player = GamePlayer(name = NAME, id = PID)
+        var state = BermudaState.new(listOf(player))
+        repeat(com.dartrack.model.BERMUDA_ROUNDS.size - 1) { state = state.applyTurn(20) }
+        state = state.applyTurn(29)
+        assertTrue(state.isFinished)
+        assertEquals(249, state.perPlayer[0].total, "sanity: exactly 249")
+        val g = GameRecord("r1", GameMode.BERMUDA, 0L, 0L, state)
+        assertFalse(status("bermuda_treasure", listOf(g)).unlocked, "249 is below 250")
+    }
+
+    // ---- full_house ---------------------------------------------------------
+
+    @Test
+    fun fullHouse_requiresPlayingEveryMode() {
+        // Play (win or lose) each mode at least once -> unlock once all modes seen.
+        val player = GamePlayer(name = NAME, id = PID)
+        fun playRecord(id: String, mode: GameMode): GameRecord {
+            val state = X01State(
+                players = listOf(player),
+                perPlayer = listOf(X01PlayerState(player, listOf(turn(40, 20)))),
+                startScore = 40,
+            )
+            return GameRecord(id, mode, 0L, 0L, state)
+        }
+        val allModes = GameMode.values().toList()
+        // Play every mode but one -> locked at size-1; the last one unlocks.
+        val missingOne = allModes.dropLast(1).mapIndexed { i, m -> playRecord("g$i", m) }
+        val sMissing = status("full_house", missingOne)
+        assertFalse(sMissing.unlocked, "one mode still unplayed")
+        assertEquals(allModes.size - 1, sMissing.progress)
+
+        val complete = missingOne + playRecord("last", allModes.last())
+        val sComplete = status("full_house", complete)
+        assertTrue(sComplete.unlocked, "playing every mode unlocks full_house")
+        assertEquals(allModes.size, sComplete.progress)
+        assertNull(sComplete.unlockedAtMs, "breadth unlock spans games")
     }
 
     // ---- bot_slayer_pro / bot_slayer_hard -----------------------------------

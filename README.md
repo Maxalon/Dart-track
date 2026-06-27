@@ -3,15 +3,15 @@
 A native Android darts tracker built in Kotlin + Jetpack Compose. Players are
 **registered once** (a stable id plus a unique display name) and then **picked
 per seat** when starting a game, so every game and every statistic is tied to a
-real player rather than a free-typed name. Twelve game modes — competitive and
+real player rather than a free-typed name. Fourteen game modes — competitive and
 practice — an optional **CPU opponent**, local game history, deep per-player
 statistics, **achievements**, cross-player **leaderboards**, app **settings**,
 and an optional voice caller. Fully offline, no ads, no accounts.
 
 ## Game modes
 
-Twelve modes, choosable from the New Game screen. X01, Cricket, Half-It and
-Gotcha are the competitive games; the rest form a **practice suite**.
+Fourteen modes, choosable from the New Game screen. X01, Cricket, Half-It,
+Gotcha and Killer are the competitive games; the rest form a **practice suite**.
 
 - **X01** — start from 101, 201, 301, 401, 501, 701 or 901, with optional
   double-out. You enter a single 0-180 three-dart total per turn (numpad with
@@ -37,6 +37,16 @@ Gotcha are the competitive games; the rest form a **practice suite**.
   nothing and you stay put), and hitting it exactly wins instantly. The twist:
   end a turn on the **same total** an opponent is currently sitting on (above 0)
   and you knock them all the way back to 0 — one turn can reset several rivals.
+- **Killer** — a 2-4 player knockout. Each seat is assigned a distinct board
+  number (seat `i` gets `20 - i`, so 20, 19, 18, 17). You first **arm** yourself
+  by hitting the **double of your own number**, then drain opponents' lives by
+  hitting **their** doubles; once armed, hitting your own double again is a
+  **self-kill** that costs you a life. Everyone starts with 3 lives (5 selectable
+  at setup); reach 0 and you're eliminated. Last player standing wins — but a
+  single visit that wipes out everyone still in it (an armed player draining the
+  last opponent as their own last life goes) is a **draw**. Entry is
+  Cricket-style per-target taps, not dart-by-dart numeric entry. Human-only — not
+  available to the CPU opponent.
 
 ### Practice suite
 
@@ -51,6 +61,11 @@ Gotcha are the competitive games; the rest form a **practice suite**.
   doubles and triples of the round number; points are `(s + 2d + 3t) × round`.
   Hitting a single, double and triple of the number in one turn is an instant
   "Shanghai" win. Otherwise the highest total after round 7 wins.
+- **Bermuda** (a.k.a. Treasure Island) — 12 rounds on a fixed target ladder (12,
+  13, 14, any Double, 15, 16, 17, any Triple, 18, 19, 20, Bull). Each round you
+  enter the points scored on that round's target; score 0 and — like Half-It —
+  your running total is **halved** (rounded down). Highest total after all 12
+  targets wins.
 - **Catch 40** — doubles ladder practice. Each player works their own ladder
   down from D20 (value 40) to D1. Catch your current double (≥1 hit) to score
   its value and drop to the next double; miss and you stay. Catching D1 finishes
@@ -110,13 +125,17 @@ is a legal 3-dart score), with no network, accounts or ads involved.
   views — such as a 3-dart-average **trend over time** and **head-to-head**
   comparisons — as they become available, and links to that player's
   **achievements** (below).
-- **Achievements** — a board of 14 milestones, computed purely from a player's
+- **Achievements** — a board of 31 milestones, computed purely from a player's
   game history and reached from the Player Stats screen. They span overall
-  dedication (play 10 / 50 / 100 games, win 25, win 3 in a row, win in 5
-  different modes), X01 feats (a 100+ visit, a maximum 180, a 100+ or the 170
-  "Big Fish" checkout, an 18-dart-or-fewer leg) and practice feats (an instant
-  Shanghai win, an Around the Clock win), grouped by category with progress bars
-  for the tiered ones.
+  dedication (play 10 / 50 / 100 games, win 25, win 3 in a row, win in / play
+  every mode), X01 feats (a 100+ visit, a maximum 180, a 100+ or the 170
+  "Big Fish" checkout, an 18-dart-or-fewer leg), CPU-opponent scalps, and
+  per-mode feats — an instant Shanghai win, an Around the Clock win, "Marksman"
+  (win Cricket), "Half Measures" (win Half-It), "Last One Standing" / the
+  flawless "Untouchable" (win Killer, the latter without losing a life),
+  "Treasure Island" / "Treasure Hunter" (win / score 250+ in Bermuda), and
+  "Full House" (play all 14 modes) — grouped by category with progress bars for
+  the tiered ones.
 - **Leaderboards** — cross-player rankings reached from Home, one card per
   category: most wins, most games, win %, best X01 3-dart average, most 180s,
   best checkout %, and fewest darts to finish a leg. Each cell is read straight
@@ -142,16 +161,20 @@ is a legal 3-dart score), with no network, accounts or ads involved.
   entry. An **Undo** button on every game screen reverts the last confirmed
   turn, reusable across multiple turns.
 - **Voice caller (optional)** — a speaker toggle reads scores and "Game shot!"
-  aloud via on-device text-to-speech. Off by default; fully offline.
+  aloud via on-device text-to-speech. Seeds from its saved default; fully
+  offline.
+- **Sound & haptic feedback** — every applied turn produces a short,
+  procedurally-synthesized sound effect and a haptic, with distinct cues for
+  scoring, busts and wins. Both are independently off-switchable in **Settings**,
+  and are fully offline with no audio assets (all tones generated in code).
 - **Animated navigation**: slide + fade transitions between screens (New Game
   enters as a slide-up modal).
 
 ## Settings
 
 Reached from the gear on the Home screen, persisted to `<app-files>/settings.json`
-(a corrupt or older file degrades cleanly to defaults). Some preferences take
-effect immediately; others are stored now and wired up as the screens that
-consume them adopt them.
+(a corrupt or older file degrades cleanly to defaults). Every preference is read
+by the screen that consumes it, so what you set here takes effect.
 
 - **Applied live:**
   - **Theme** — System / Light / Dark, applied app-wide.
@@ -159,11 +182,18 @@ consume them adopt them.
   - **Keep screen on** — holds the screen awake while the app is in front.
   - **Confirm before delete** — when on, deleting a game from its detail screen
     asks first; when off, it deletes immediately.
-- **Stored (persisted preferences, not yet applied):** a default for the voice
-  caller, sound effects, haptics, and X01 defaults for the start score and
-  double-out. These are saved and round-trip, but the game and New Game screens
-  don't read them yet — the voice caller still defaults off, and X01 setup still
-  starts at 501 / double-out — so they're wired but inert for now.
+  - **Sound effects** and **haptics** — gate the procedural audio/haptic
+    feedback played on every applied turn in every mode (including the CPU's
+    auto-played visits). The sound is **fully offline and on-device with no audio
+    assets** — every tone is synthesized in code — and degrades silently to a
+    no-op on a device with no audio output or vibrator. Notable cues: a confirm
+    click, a bust buzz (X01), a big-score chime (an X01 180), leg / match / game
+    win fanfares, and a life-lost cue (Killer).
+  - **Voice caller default** — the in-game caller toggle seeds from this saved
+    default (the caller itself still starts whatever this default says, and can
+    be toggled per game).
+  - **X01 defaults** — the start score and double-out used to seed the New Game
+    screen, which reads them when you set up an X01 game.
 
 ## Local data
 
@@ -190,13 +220,16 @@ consume them adopt them.
   3. creates a git tag `v0.1.<count>` and a GitHub Release with the APK attached
      as `dart-track-0.1.<count>.apk`.
 
-Unit tests live under `app/src/test/` — roughly **393** JVM tests — and cover
+Unit tests live under `app/src/test/` — roughly **567** JVM tests — and cover
 the game-mode rules of every mode (X01 bust/finish/undo and stat math, Cricket
-scoring/win conditions including Cut-Throat, Half-It halving, Count-Up, Checkout
-Trainer, Baseball, Golf, Gotcha and the rest of the practice suite), the **CPU
-opponent** (its calibration and X01/Count-Up integration), **achievements**,
-**leaderboards & records**, **settings** encode/decode, the player registry, and
-JSON persistence round-trips. Run them with `./gradlew :app:testDebugUnitTest`.
+scoring/win conditions including Cut-Throat, Half-It halving, Killer's
+arm/drain/self-kill knockout and draw logic, Bermuda's target ladder and
+halving, Count-Up, Checkout Trainer, Baseball, Golf, Gotcha and the rest of the
+practice suite), the **CPU opponent** (its calibration and X01/Count-Up
+integration), the **sound/haptic feedback** module (its event mapping and
+procedural tone specs), **achievements**, **leaderboards & records**,
+**settings** encode/decode, the player registry, and JSON persistence
+round-trips. Run them with `./gradlew :app:testDebugUnitTest`.
 
 ## APK install
 

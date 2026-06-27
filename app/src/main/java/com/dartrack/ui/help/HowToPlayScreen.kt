@@ -154,6 +154,22 @@ fun HowToPlayScreen(onBack: () -> Unit) {
                     "— triple = 1 stroke, double = 2, single = 3, a miss = 5. Lowest total " +
                     "strokes after nine holes wins.",
             )
+            ModeCard(
+                "Killer",
+                "2-4 players. Each player is given a board number (shown on screen). First hit " +
+                    "the DOUBLE of YOUR number to become a 'killer'. Once armed, hitting the " +
+                    "double of an opponent's number knocks off one of their lives. Careful: once " +
+                    "you're a killer, hitting your OWN double again costs you a life! Lose all " +
+                    "your lives and you're out — last player standing wins. Each turn, tap the " +
+                    "double you hit for each of your (up to 3) darts.",
+            )
+            ModeCard(
+                "Bermuda",
+                "1-4 players, 12 rounds on a fixed ladder of targets: 12, 13, 14, any Double, " +
+                    "15, 16, 17, any Triple, 18, 19, 20, Bull. Each round you throw 3 darts at " +
+                    "the round's target and enter the points you scored on it. Score 0 in a round " +
+                    "and your running total is HALVED. Highest total after all 12 targets wins.",
+            )
 
             SectionHeader("More")
             ModeCard(

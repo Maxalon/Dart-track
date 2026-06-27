@@ -41,14 +41,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.dartrack.data.GameRepository
-import com.dartrack.model.HALF_IT_ROUNDS
-import com.dartrack.model.HalfItPlayerState
-import com.dartrack.model.HalfItState
-import com.dartrack.model.HalfItTarget
+import com.dartrack.model.BERMUDA_ROUNDS
+import com.dartrack.model.BermudaPlayerState
+import com.dartrack.model.BermudaState
+import com.dartrack.model.BermudaTarget
 import com.dartrack.viewmodel.GameViewModel
 
 @Composable
-fun HalfItGameScreen(
+fun BermudaScreen(
     recordId: String,
     onExit: () -> Unit,
 ) {
@@ -59,18 +59,18 @@ fun HalfItGameScreen(
         factory = GameViewModel.Factory(repo, recordId),
     )
     val record by vm.record.collectAsState()
-    val state = record?.state as? HalfItState ?: return
+    val state = record?.state as? BermudaState ?: return
 
     var entry by remember { mutableStateOf("") }
     val target = state.currentTarget()
-    val maxValue = maxValueForTarget(target)
+    val maxValue = maxValueForBermudaTarget(target)
 
     val caller = rememberCaller()
     var callerOn by rememberCallerOnDefault()
 
-    // Announce a Half-It round: the points scored, or "Halved" when nothing
-    // was hit (which halves the running total per HalfItState.applyTurn).
-    fun announceHalfIt(points: Int) {
+    // Announce a Bermuda round: the points scored, or "Halved" when nothing was
+    // hit (which halves the running total per BermudaState.applyTurn).
+    fun announceBermuda(points: Int) {
         if (!callerOn) return
         val text = when {
             points == 0 -> "Halved"
@@ -92,7 +92,7 @@ fun HalfItGameScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                "Half-It · ${HALF_IT_ROUNDS.size} rounds",
+                "Bermuda · ${BERMUDA_ROUNDS.size} rounds",
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.weight(1f),
@@ -110,7 +110,7 @@ fun HalfItGameScreen(
 
         // ---- Compact round/target indicator (not a giant hero card). ------
         if (!state.isFinished) {
-            HalfItHeader(state, target)
+            BermudaHeader(state, target)
         }
 
         // ---- Players area: absorbs spare vertical space (no scroll). The
@@ -122,7 +122,7 @@ fun HalfItGameScreen(
                 val active = idx == state.currentPlayerIndex && !state.isFinished
                 val isWinner = state.winnerIndices.contains(idx)
 
-                PlayerCard(
+                BermudaPlayerCard(
                     name = p.name,
                     ps = ps,
                     active = active,
@@ -144,7 +144,7 @@ fun HalfItGameScreen(
                     Spacer(Modifier.height(8.dp))
                     Row {
                         TextButton(onClick = onExit) { Text("Back to home") }
-                        TextButton(onClick = { vm.undoHalfIt() }) { Text("Undo last turn") }
+                        TextButton(onClick = { vm.undoBermuda() }) { Text("Undo last turn") }
                     }
                 }
             }
@@ -155,11 +155,11 @@ fun HalfItGameScreen(
                     entry = entry,
                     onEntryChange = { entry = it },
                     onConfirm = { v ->
-                        announceHalfIt(v)
-                        vm.applyHalfItTurn(v)
+                        announceBermuda(v)
+                        vm.applyBermudaTurn(v)
                         entry = ""
                     },
-                    onUndo = { vm.undoHalfIt(); entry = "" },
+                    onUndo = { vm.undoBermuda(); entry = "" },
                     maxValue = maxValue,
                 )
             }
@@ -168,11 +168,11 @@ fun HalfItGameScreen(
 }
 
 /**
- * Compact round/target indicator (e.g. "Round 6/9 · Any Triple") as a small
+ * Compact round/target indicator (e.g. "Round 6/12 · Any Triple") as a small
  * header — not a giant hero card — so the screen fits without scrolling.
  */
 @Composable
-private fun HalfItHeader(state: HalfItState, target: HalfItTarget?) {
+private fun BermudaHeader(state: BermudaState, target: BermudaTarget?) {
     Surface(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
         shape = MaterialTheme.shapes.large,
@@ -185,7 +185,7 @@ private fun HalfItHeader(state: HalfItState, target: HalfItTarget?) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                "Round ${state.currentRound + 1}/${HALF_IT_ROUNDS.size}",
+                "Round ${state.currentRound + 1}/${BERMUDA_ROUNDS.size}",
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold,
             )
@@ -210,9 +210,9 @@ private fun HalfItHeader(state: HalfItState, target: HalfItTarget?) {
  * scoreboard. The running total is animated so it counts to its new value.
  */
 @Composable
-private fun PlayerCard(
+private fun BermudaPlayerCard(
     name: String,
-    ps: HalfItPlayerState,
+    ps: BermudaPlayerState,
     active: Boolean,
     isWinner: Boolean,
 ) {
@@ -227,7 +227,7 @@ private fun PlayerCard(
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
 
-    val animatedTotal by animateIntAsState(targetValue = ps.total, label = "halfItTotal")
+    val animatedTotal by animateIntAsState(targetValue = ps.total, label = "bermudaTotal")
 
     ElevatedCard(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
@@ -284,10 +284,10 @@ private fun PlayerCard(
     }
 }
 
-private fun maxValueForTarget(target: HalfItTarget?): Int = when (target) {
+private fun maxValueForBermudaTarget(target: BermudaTarget?): Int = when (target) {
     null -> 0
-    is HalfItTarget.Number -> target.n * 3 * 3 // 3 darts at triple
-    HalfItTarget.AnyDouble -> 120  // 3 × D20
-    HalfItTarget.AnyTriple -> 180  // 3 × T20
-    HalfItTarget.Bullseye -> 150   // 3 × double-bull
+    is BermudaTarget.Number -> target.n * 3 * 3 // 3 darts at triple
+    BermudaTarget.AnyDouble -> 120  // 3 × D20
+    BermudaTarget.AnyTriple -> 180  // 3 × T20
+    BermudaTarget.Bullseye -> 150   // 3 × double-bull
 }

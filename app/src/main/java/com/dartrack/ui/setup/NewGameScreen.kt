@@ -48,6 +48,7 @@ import com.dartrack.model.GameMode
 import com.dartrack.model.GamePlayer
 import com.dartrack.model.AroundTheClockState
 import com.dartrack.model.BaseballState
+import com.dartrack.model.BermudaState
 import com.dartrack.model.BobsTwentySevenState
 import com.dartrack.model.Catch40State
 import com.dartrack.model.CountUpState
@@ -56,6 +57,7 @@ import com.dartrack.model.CricketState
 import com.dartrack.model.GolfState
 import com.dartrack.model.GotchaState
 import com.dartrack.model.HalfItState
+import com.dartrack.model.KillerState
 import com.dartrack.model.Player
 import com.dartrack.model.ShanghaiState
 import com.dartrack.model.X01State
@@ -115,6 +117,7 @@ fun NewGameScreen(
     var legsToWin by remember { mutableStateOf(1) }
     var setsToWin by remember { mutableStateOf(1) }
     var cutThroat by remember { mutableStateOf(false) }
+    var killerLives by remember { mutableStateOf(3) }
     // One choice per seat; start with two empty human seats.
     val seats = remember {
         mutableStateListOf<SeatChoice>(SeatChoice.Human(null), SeatChoice.Human(null))
@@ -165,6 +168,8 @@ fun NewGameScreen(
                         GameMode.BASEBALL -> "Baseball"
                         GameMode.GOLF -> "Golf"
                         GameMode.GOTCHA -> "Gotcha"
+                        GameMode.KILLER -> "Killer"
+                        GameMode.BERMUDA -> "Bermuda"
                     }) },
                 )
             }
@@ -230,6 +235,23 @@ fun NewGameScreen(
                     onClick = { cutThroat = !cutThroat },
                     label = { Text("Cut-throat") },
                 )
+            }
+        }
+
+        if (mode == GameMode.KILLER) {
+            Spacer(Modifier.height(16.dp))
+            Text("Lives", fontWeight = FontWeight.SemiBold)
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                listOf(3, 5).forEach { n ->
+                    FilterChip(
+                        selected = killerLives == n,
+                        onClick = { killerLives = n },
+                        label = { Text(n.toString()) },
+                    )
+                }
             }
         }
 
@@ -309,7 +331,10 @@ fun NewGameScreen(
         val allSeatsFilled = humanSeats.all { it.player != null }
         val distinctHumans = chosenHumans.map { it.id }.toSet().size == chosenHumans.size
         val hasHuman = chosenHumans.isNotEmpty()
-        val canStart = seats.isNotEmpty() && allSeatsFilled && distinctHumans && hasHuman
+        // Killer requires at least two players (the model rejects a single seat).
+        val enoughForKiller = mode != GameMode.KILLER || seats.size >= 2
+        val canStart = seats.isNotEmpty() && allSeatsFilled && distinctHumans && hasHuman &&
+            enoughForKiller
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = onCancel) { Text("Cancel") }
             Button(
@@ -342,6 +367,8 @@ fun NewGameScreen(
                         GameMode.BASEBALL -> BaseballState.new(gamePlayers)
                         GameMode.GOLF -> GolfState.new(gamePlayers)
                         GameMode.GOTCHA -> GotchaState.new(gamePlayers)
+                        GameMode.KILLER -> KillerState.new(gamePlayers, killerLives)
+                        GameMode.BERMUDA -> BermudaState.new(gamePlayers)
                     }
                     val now = System.currentTimeMillis()
                     val record = GameRecord(
@@ -364,6 +391,7 @@ fun NewGameScreen(
             Spacer(Modifier.height(8.dp))
             Text(
                 when {
+                    !enoughForKiller -> "Killer needs at least 2 players."
                     !allSeatsFilled -> "Pick a registered player for every non-CPU seat."
                     !hasHuman -> "Add at least one human player."
                     else -> "Each seat must be a different player."

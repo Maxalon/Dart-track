@@ -4,6 +4,7 @@ import com.dartrack.model.GameMode
 import com.dartrack.model.GameState
 import com.dartrack.model.AroundTheClockState
 import com.dartrack.model.BaseballState
+import com.dartrack.model.BermudaState
 import com.dartrack.model.BobsTwentySevenState
 import com.dartrack.model.Catch40State
 import com.dartrack.model.CountUpState
@@ -12,6 +13,7 @@ import com.dartrack.model.CricketState
 import com.dartrack.model.GolfState
 import com.dartrack.model.GotchaState
 import com.dartrack.model.HalfItState
+import com.dartrack.model.KillerState
 import com.dartrack.model.ShanghaiState
 import com.dartrack.model.X01State
 import kotlinx.serialization.Serializable
@@ -107,4 +109,6 @@ fun GameState.toMode(): GameMode = when (this) {
     is BaseballState -> GameMode.BASEBALL
     is GolfState -> GameMode.GOLF
     is GotchaState -> GameMode.GOTCHA
+    is KillerState -> GameMode.KILLER
+    is BermudaState -> GameMode.BERMUDA
 }

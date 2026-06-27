@@ -4,8 +4,16 @@ import android.content.Context
 import android.speech.tts.TextToSpeech
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import com.dartrack.data.SettingsRepository
 import java.util.Locale
 
 /**
@@ -104,4 +112,30 @@ fun rememberCaller(): Caller {
         onDispose { caller.shutdown() }
     }
     return caller
+}
+
+/**
+ * A saveable on/off state for a screen's voice caller toggle, seeded ONCE from
+ * the persisted [Settings.voiceCallerDefault] after settings load (mirroring how
+ * the New Game screen applies its saved defaults). The seed is applied a single
+ * time and never fights a later manual toggle, and the value survives rotation /
+ * process death via [rememberSaveable]. Screens use it as:
+ *
+ *     var callerOn by rememberCallerOnDefault()
+ */
+@Composable
+fun rememberCallerOnDefault(): MutableState<Boolean> {
+    val context = LocalContext.current
+    val repo = remember { SettingsRepository.get(context) }
+    LaunchedEffect(Unit) { repo.load() }
+    val settings by repo.settings.collectAsState()
+    val callerOn = rememberSaveable { mutableStateOf(false) }
+    var seeded by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(settings) {
+        if (!seeded) {
+            callerOn.value = settings.voiceCallerDefault
+            seeded = true
+        }
+    }
+    return callerOn
 }

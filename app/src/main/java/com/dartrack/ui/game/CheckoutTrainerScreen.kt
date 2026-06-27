@@ -24,7 +24,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -64,7 +63,7 @@ fun CheckoutTrainerScreen(
     val state = record?.state as? CheckoutTrainerState ?: return
 
     val caller = rememberCaller()
-    var callerOn by rememberSaveable { mutableStateOf(false) }
+    var callerOn by rememberCallerOnDefault()
 
     // Record an attempt, announcing the outcome. "Checkout!" on a hit; when the
     // hit is the final attempt of the ladder it becomes "Game shot!". A miss is

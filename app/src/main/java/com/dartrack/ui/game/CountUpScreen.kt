@@ -26,7 +26,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -70,7 +69,7 @@ fun CountUpScreen(
         state.players.getOrNull(state.currentPlayerIndex)?.isBot == true
 
     val caller = rememberCaller()
-    var callerOn by rememberSaveable { mutableStateOf(false) }
+    var callerOn by rememberCallerOnDefault()
 
     // Announce the just-entered total, then "Game shot!" if that turn finished
     // the game (computed from the immutable next state so we don't race the VM).
