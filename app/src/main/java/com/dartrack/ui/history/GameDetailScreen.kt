@@ -47,6 +47,7 @@ import com.dartrack.model.GOLF_HOLES
 import com.dartrack.model.GolfState
 import com.dartrack.model.GotchaState
 import com.dartrack.model.HalfItState
+import com.dartrack.model.KillerState
 import com.dartrack.model.SHANGHAI_ROUNDS
 import com.dartrack.model.ShanghaiState
 import com.dartrack.model.X01State
@@ -113,6 +114,7 @@ fun GameDetailScreen(
                     GameMode.BASEBALL -> "Baseball"
                     GameMode.GOLF -> "Golf"
                     GameMode.GOTCHA -> "Gotcha"
+                    GameMode.KILLER -> "Killer"
                 }, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                 Text("Started: ${df.format(Date(rec.createdAtEpochMs))}")
                 Text("Updated: ${df.format(Date(rec.updatedAtEpochMs))}")
@@ -135,6 +137,7 @@ fun GameDetailScreen(
             is BaseballState -> BaseballDetail(s)
             is GolfState -> GolfDetail(s)
             is GotchaState -> GotchaDetail(s)
+            is KillerState -> KillerDetail(s)
         }
 
         Spacer(Modifier.height(12.dp))
@@ -466,6 +469,36 @@ private fun GotchaDetail(s: GotchaState) {
                     )
                 }
                 Spacer(Modifier.height(6.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun KillerDetail(s: KillerState) {
+    Card(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(
+                "start lives: ${s.startLives}",
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(6.dp))
+            s.players.forEachIndexed { idx, p ->
+                val ps = s.perPlayer[idx]
+                Text(
+                    "${p.name}: D${ps.number}" +
+                        " · " + (if (ps.isEliminated) "OUT" else "${ps.lives} lives") +
+                        " · " + (if (ps.isKiller) "ARMED" else "not armed"),
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Spacer(Modifier.height(6.dp))
+            }
+            if (s.isFinished) {
+                Text(
+                    "Winner: ${s.winnerIndices.joinToString { s.players[it].name }}",
+                    fontWeight = FontWeight.SemiBold,
+                )
             }
         }
     }

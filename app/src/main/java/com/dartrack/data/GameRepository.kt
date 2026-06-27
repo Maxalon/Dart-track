@@ -13,6 +13,7 @@ import com.dartrack.model.GameState
 import com.dartrack.model.GolfState
 import com.dartrack.model.GotchaState
 import com.dartrack.model.HalfItState
+import com.dartrack.model.KillerState
 import com.dartrack.model.ShanghaiState
 import com.dartrack.model.X01State
 import kotlinx.coroutines.Dispatchers
@@ -173,6 +174,7 @@ fun GameState.withPlayers(players: List<GamePlayer>): GameState = when (this) {
     is BaseballState -> copy(players = players)
     is GolfState -> copy(players = players)
     is GotchaState -> copy(players = players)
+    is KillerState -> copy(players = players)
 }
 
 /** A game record paired with whether [reassignPlayerInRecords] changed it. */

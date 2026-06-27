@@ -19,6 +19,7 @@ import com.dartrack.model.GolfResult
 import com.dartrack.model.GolfState
 import com.dartrack.model.GotchaState
 import com.dartrack.model.HalfItState
+import com.dartrack.model.KillerState
 import com.dartrack.model.ShanghaiState
 import com.dartrack.model.X01State
 import com.dartrack.model.bot.BotLevel
@@ -212,6 +213,10 @@ class GameViewModel(
         mutate { (it as GotchaState).applyTurn(total) }
 
     fun undoGotcha() = mutate { (it as GotchaState).undoLast() }
+
+    fun applyKillerTurn(hits: List<Int>) = mutate { (it as KillerState).applyTurn(hits) }
+
+    fun undoKiller() = mutate { (it as KillerState).undoLast() }
 
     class Factory(
         private val repo: GameRepository,

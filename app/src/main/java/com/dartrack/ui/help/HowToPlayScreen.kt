@@ -154,6 +154,15 @@ fun HowToPlayScreen(onBack: () -> Unit) {
                     "— triple = 1 stroke, double = 2, single = 3, a miss = 5. Lowest total " +
                     "strokes after nine holes wins.",
             )
+            ModeCard(
+                "Killer",
+                "2-4 players. Each player is given a board number (shown on screen). First hit " +
+                    "the DOUBLE of YOUR number to become a 'killer'. Once armed, hitting the " +
+                    "double of an opponent's number knocks off one of their lives. Careful: once " +
+                    "you're a killer, hitting your OWN double again costs you a life! Lose all " +
+                    "your lives and you're out — last player standing wins. Each turn, tap the " +
+                    "double you hit for each of your (up to 3) darts.",
+            )
 
             SectionHeader("More")
             ModeCard(

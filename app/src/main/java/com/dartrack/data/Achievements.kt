@@ -8,6 +8,7 @@ import com.dartrack.model.GOLF_HOLES
 import com.dartrack.model.GameMode
 import com.dartrack.model.GolfState
 import com.dartrack.model.GotchaState
+import com.dartrack.model.KillerState
 import com.dartrack.model.ShanghaiState
 import com.dartrack.model.X01State
 import com.dartrack.model.X01Stats
@@ -205,6 +206,12 @@ object AchievementCatalog {
         description = "Win a game of Gotcha.",
         category = "Practice",
     )
+    private val KILLER_WINNER = Achievement(
+        id = "killer_winner",
+        title = "Last One Standing",
+        description = "Win a game of Killer.",
+        category = "Practice",
+    )
 
     // ---- CPU opponent ----
     private val BOT_SLAYER_HARD = Achievement(
@@ -260,6 +267,7 @@ object AchievementCatalog {
         BASEBALL_SLUGGER,
         COUNTUP_HIGH,
         GOTCHA_WINNER,
+        KILLER_WINNER,
         BOT_SLAYER_HARD,
         BOT_SLAYER_PRO,
         MODE_EXPLORER,
@@ -344,6 +352,7 @@ fun achievementsFor(playerId: String, games: List<GameRecord>): List<Achievement
     val baseballSlugger = Tally(target = 1)
     val countUpHigh = Tally(target = 1)
     val gotchaWinner = Tally(target = 1)
+    val killerWinner = Tally(target = 1)
     val botSlayerHard = Tally(target = 1)
     val botSlayerPro = Tally(target = 1)
 
@@ -477,6 +486,11 @@ fun achievementsFor(playerId: String, games: List<GameRecord>): List<Achievement
                 gotchaWinner.mark(at)
             }
 
+            // Killer: simply win a game.
+            if (state is KillerState && won) {
+                killerWinner.mark(at)
+            }
+
             // CPU opponent: win (as a human seat) a game in which an OPPONENT seat
             // is a bot of the given level. The bot is only wired into X01 and
             // Count-Up, but this keys on the seat metadata rather than the mode, so
@@ -546,6 +560,7 @@ fun achievementsFor(playerId: String, games: List<GameRecord>): List<Achievement
         put("baseball_slugger", baseballSlugger.toStatus(AchievementCatalog.all.first { it.id == "baseball_slugger" }))
         put("countup_high", countUpHigh.toStatus(AchievementCatalog.all.first { it.id == "countup_high" }))
         put("gotcha_winner", gotchaWinner.toStatus(AchievementCatalog.all.first { it.id == "gotcha_winner" }))
+        put("killer_winner", killerWinner.toStatus(AchievementCatalog.all.first { it.id == "killer_winner" }))
         put("bot_slayer_hard", botSlayerHard.toStatus(AchievementCatalog.all.first { it.id == "bot_slayer_hard" }))
         put("bot_slayer_pro", botSlayerPro.toStatus(AchievementCatalog.all.first { it.id == "bot_slayer_pro" }))
         put("streak_3", streak3)

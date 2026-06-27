@@ -395,6 +395,9 @@ private fun ModeSummariesCard(s: PlayerStatsData) {
         if (s.gotcha.gamesPlayed > 0) {
             add("Gotcha" to "${s.gotcha.gamesPlayed} games · wins ${s.gotcha.gamesWon}")
         }
+        if (s.killer.gamesPlayed > 0) {
+            add("Killer" to "${s.killer.gamesPlayed} games · wins ${s.killer.gamesWon}")
+        }
     }
     if (rows.isEmpty()) return
     StatsCard("Other modes") {

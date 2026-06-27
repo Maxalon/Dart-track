@@ -4,7 +4,7 @@ import com.dartrack.model.bot.BotLevel
 import kotlinx.serialization.Serializable
 
 @Serializable
-enum class GameMode { X01, CRICKET, HALF_IT, AROUND_CLOCK, BOBS_27, SHANGHAI, CATCH_40, COUNT_UP, CHECKOUT_TRAINER, BASEBALL, GOLF, GOTCHA }
+enum class GameMode { X01, CRICKET, HALF_IT, AROUND_CLOCK, BOBS_27, SHANGHAI, CATCH_40, COUNT_UP, CHECKOUT_TRAINER, BASEBALL, GOLF, GOTCHA, KILLER }
 
 /**
  * One seat in a game. Usually backed by a registered player ([id] is their

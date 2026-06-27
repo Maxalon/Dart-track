@@ -146,6 +146,7 @@ fun HistoryScreen(
                                         GameMode.BASEBALL -> "Baseball"
                                         GameMode.GOLF -> "Golf"
                                         GameMode.GOTCHA -> "Gotcha"
+                                        GameMode.KILLER -> "Killer"
                                     },
                                     fontWeight = FontWeight.SemiBold,
                                     modifier = Modifier.weight(1f),

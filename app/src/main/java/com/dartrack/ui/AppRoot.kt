@@ -31,6 +31,7 @@ import com.dartrack.ui.game.CricketGameScreen
 import com.dartrack.ui.game.GolfScreen
 import com.dartrack.ui.game.GotchaScreen
 import com.dartrack.ui.game.HalfItGameScreen
+import com.dartrack.ui.game.KillerScreen
 import com.dartrack.ui.game.ShanghaiScreen
 import com.dartrack.ui.game.X01GameScreen
 import com.dartrack.ui.help.HowToPlayScreen
@@ -179,6 +180,10 @@ fun AppRoot() {
                     onExit = { nav.popBackStack("home", inclusive = false) },
                 )
                 com.dartrack.model.GameMode.GOTCHA -> GotchaScreen(
+                    recordId = id,
+                    onExit = { nav.popBackStack("home", inclusive = false) },
+                )
+                com.dartrack.model.GameMode.KILLER -> KillerScreen(
                     recordId = id,
                     onExit = { nav.popBackStack("home", inclusive = false) },
                 )

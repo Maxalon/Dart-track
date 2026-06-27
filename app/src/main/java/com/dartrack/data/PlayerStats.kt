@@ -10,6 +10,7 @@ import com.dartrack.model.CricketState
 import com.dartrack.model.GolfState
 import com.dartrack.model.GotchaState
 import com.dartrack.model.HalfItState
+import com.dartrack.model.KillerState
 import com.dartrack.model.ShanghaiState
 import com.dartrack.model.X01State
 import com.dartrack.model.X01Stats
@@ -87,6 +88,7 @@ data class ModeSummary(
      *  - Golf: fewest total strokes across a game (0 if the player never played
      *    a game; lower is better, so a sentinel of 0 means "no result").
      *  - Gotcha: games won (mirrors [gamesWon]).
+     *  - Killer: games won (mirrors [gamesWon]).
      */
     val best: Int,
 )
@@ -130,6 +132,7 @@ data class PlayerStatsData(
     val baseball: ModeSummary,
     val golf: ModeSummary,
     val gotcha: ModeSummary,
+    val killer: ModeSummary,
 )
 
 /**
@@ -191,6 +194,7 @@ fun playerStats(playerId: String, games: List<GameRecord>): PlayerStatsData {
     // Golf is lowest-strokes; 0 is the "no result" sentinel (lower is better).
     var golfPlayed = 0; var golfWon = 0; var golfBestStrokes = 0
     var gotchaPlayed = 0; var gotchaWon = 0
+    var killerPlayed = 0; var killerWon = 0
 
     if (playerId.isNotBlank()) {
         for (r in games) {
@@ -329,6 +333,10 @@ fun playerStats(playerId: String, games: List<GameRecord>): PlayerStatsData {
                     gotchaPlayed++
                     if (won) gotchaWon++
                 }
+                is KillerState -> {
+                    killerPlayed++
+                    if (won) killerWon++
+                }
             }
         }
     }
@@ -387,6 +395,7 @@ fun playerStats(playerId: String, games: List<GameRecord>): PlayerStatsData {
         baseball = ModeSummary(baseballPlayed, baseballWon, best = baseballHigh),
         golf = ModeSummary(golfPlayed, golfWon, best = golfBestStrokes),
         gotcha = ModeSummary(gotchaPlayed, gotchaWon, best = gotchaWon),
+        killer = ModeSummary(killerPlayed, killerWon, best = killerWon),
     )
 }
 
