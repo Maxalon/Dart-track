@@ -5,10 +5,12 @@ import com.dartrack.model.BaseballState
 import com.dartrack.model.BermudaState
 import com.dartrack.model.CheckoutTrainerState
 import com.dartrack.model.CountUpState
+import com.dartrack.model.CricketState
 import com.dartrack.model.GOLF_HOLES
 import com.dartrack.model.GameMode
 import com.dartrack.model.GolfState
 import com.dartrack.model.GotchaState
+import com.dartrack.model.HalfItState
 import com.dartrack.model.KillerState
 import com.dartrack.model.ShanghaiState
 import com.dartrack.model.X01State
@@ -85,6 +87,10 @@ object AchievementCatalog {
     const val MODE_EXPLORER_TARGET: Int = 8
     /** Distinct modes that must be WON to unlock [ALL_TWELVE] (every mode). */
     val ALL_TWELVE_TARGET: Int = GameMode.values().size
+    /** Distinct modes that must be PLAYED to unlock [FULL_HOUSE] (every mode). */
+    val FULL_HOUSE_TARGET: Int = GameMode.values().size
+    /** Final total that qualifies a Bermuda game for the treasure-hunter feat. */
+    const val BERMUDA_TREASURE_TOTAL: Int = 250
 
     // ---- Milestones / dedication ----
     private val FIRST_WIN = Achievement(
@@ -219,6 +225,30 @@ object AchievementCatalog {
         description = "Win a game of Bermuda.",
         category = "Practice",
     )
+    private val CRICKET_WINNER = Achievement(
+        id = "cricket_winner",
+        title = "Marksman",
+        description = "Win a game of Cricket.",
+        category = "Practice",
+    )
+    private val HALF_IT_WINNER = Achievement(
+        id = "half_it_winner",
+        title = "Half Measures",
+        description = "Win a game of Half-It.",
+        category = "Practice",
+    )
+    private val KILLER_UNTOUCHABLE = Achievement(
+        id = "killer_untouchable",
+        title = "Untouchable",
+        description = "Win a game of Killer without losing a life.",
+        category = "Practice",
+    )
+    private val BERMUDA_TREASURE = Achievement(
+        id = "bermuda_treasure",
+        title = "Treasure Hunter",
+        description = "Reach a total of $BERMUDA_TREASURE_TOTAL or more in a Bermuda game.",
+        category = "Practice",
+    )
 
     // ---- CPU opponent ----
     private val BOT_SLAYER_HARD = Achievement(
@@ -253,6 +283,12 @@ object AchievementCatalog {
         description = "Win a game in all $ALL_TWELVE_TARGET modes.",
         category = "Modes",
     )
+    private val FULL_HOUSE = Achievement(
+        id = "full_house",
+        title = "Full House",
+        description = "Play all $FULL_HOUSE_TARGET game modes at least once.",
+        category = "Modes",
+    )
 
     val all: List<Achievement> = listOf(
         FIRST_WIN,
@@ -276,11 +312,16 @@ object AchievementCatalog {
         GOTCHA_WINNER,
         KILLER_WINNER,
         BERMUDA_WINNER,
+        CRICKET_WINNER,
+        HALF_IT_WINNER,
+        KILLER_UNTOUCHABLE,
+        BERMUDA_TREASURE,
         BOT_SLAYER_HARD,
         BOT_SLAYER_PRO,
         MODE_EXPLORER,
         STREAK_5,
         ALL_TWELVE,
+        FULL_HOUSE,
     )
 }
 
@@ -339,7 +380,8 @@ private class Tally(val target: Int) {
  * feat. Achievements whose qualifying game cannot be pinpointed report null even
  * once unlocked — here that is the win-streak ([streak_3] / [streak_5]) and the
  * distinct-mode achievements ([all_rounder] / [mode_explorer] / [all_twelve]),
- * which all depend on a SET of games rather than one.
+ * the breadth achievement [full_house]), which all depend on a SET of games
+ * rather than one.
  */
 fun achievementsFor(playerId: String, games: List<GameRecord>): List<AchievementStatus> {
     val firstWin = Tally(target = 1)
@@ -362,6 +404,10 @@ fun achievementsFor(playerId: String, games: List<GameRecord>): List<Achievement
     val gotchaWinner = Tally(target = 1)
     val killerWinner = Tally(target = 1)
     val bermudaWinner = Tally(target = 1)
+    val cricketWinner = Tally(target = 1)
+    val halfItWinner = Tally(target = 1)
+    val killerUntouchable = Tally(target = 1)
+    val bermudaTreasure = Tally(target = 1)
     val botSlayerHard = Tally(target = 1)
     val botSlayerPro = Tally(target = 1)
 
@@ -495,14 +541,37 @@ fun achievementsFor(playerId: String, games: List<GameRecord>): List<Achievement
                 gotchaWinner.mark(at)
             }
 
+            // Cricket: simply win a game.
+            if (state is CricketState && won) {
+                cricketWinner.mark(at)
+            }
+
+            // Half-It: simply win a game.
+            if (state is HalfItState && won) {
+                halfItWinner.mark(at)
+            }
+
             // Killer: simply win a game.
-            if (state is KillerState && won) {
+            val killer = state as? KillerState
+            if (killer != null && won) {
                 killerWinner.mark(at)
+                // Untouchable: a SOLE-winner Killer game (no multi-winner draw)
+                // where this player's lives never dropped below the start count.
+                if (killer.winnerIndices.size == 1 &&
+                    killer.perPlayer[idx].lives == killer.startLives
+                ) {
+                    killerUntouchable.mark(at)
+                }
             }
 
             // Bermuda: simply win a game.
-            if (state is BermudaState && won) {
-                bermudaWinner.mark(at)
+            val bermuda = state as? BermudaState
+            if (bermuda != null) {
+                if (won) bermudaWinner.mark(at)
+                // Treasure Hunter: reach a big final total (won or not).
+                if (bermuda.perPlayer[idx].total >= AchievementCatalog.BERMUDA_TREASURE_TOTAL) {
+                    bermudaTreasure.mark(at)
+                }
             }
 
             // CPU opponent: win (as a human seat) a game in which an OPPONENT seat
@@ -555,6 +624,13 @@ fun achievementsFor(playerId: String, games: List<GameRecord>): List<Achievement
         target = AchievementCatalog.ALL_TWELVE_TARGET,
         unlockedAtMs = null, // spans multiple games; no single qualifying record
     )
+    val fullHouse = AchievementStatus(
+        achievement = AchievementCatalog.all.first { it.id == "full_house" },
+        unlocked = modesPlayed.size >= AchievementCatalog.FULL_HOUSE_TARGET,
+        progress = modesPlayed.size.coerceAtMost(AchievementCatalog.FULL_HOUSE_TARGET),
+        target = AchievementCatalog.FULL_HOUSE_TARGET,
+        unlockedAtMs = null, // spans multiple games; no single qualifying record
+    )
 
     val byId: Map<String, AchievementStatus> = buildMap {
         put("first_win", firstWin.toStatus(AchievementCatalog.all.first { it.id == "first_win" }))
@@ -576,6 +652,10 @@ fun achievementsFor(playerId: String, games: List<GameRecord>): List<Achievement
         put("gotcha_winner", gotchaWinner.toStatus(AchievementCatalog.all.first { it.id == "gotcha_winner" }))
         put("killer_winner", killerWinner.toStatus(AchievementCatalog.all.first { it.id == "killer_winner" }))
         put("bermuda_winner", bermudaWinner.toStatus(AchievementCatalog.all.first { it.id == "bermuda_winner" }))
+        put("cricket_winner", cricketWinner.toStatus(AchievementCatalog.all.first { it.id == "cricket_winner" }))
+        put("half_it_winner", halfItWinner.toStatus(AchievementCatalog.all.first { it.id == "half_it_winner" }))
+        put("killer_untouchable", killerUntouchable.toStatus(AchievementCatalog.all.first { it.id == "killer_untouchable" }))
+        put("bermuda_treasure", bermudaTreasure.toStatus(AchievementCatalog.all.first { it.id == "bermuda_treasure" }))
         put("bot_slayer_hard", botSlayerHard.toStatus(AchievementCatalog.all.first { it.id == "bot_slayer_hard" }))
         put("bot_slayer_pro", botSlayerPro.toStatus(AchievementCatalog.all.first { it.id == "bot_slayer_pro" }))
         put("streak_3", streak3)
@@ -583,6 +663,7 @@ fun achievementsFor(playerId: String, games: List<GameRecord>): List<Achievement
         put("streak_5", streak5)
         put("mode_explorer", modeExplorer)
         put("all_twelve", allTwelve)
+        put("full_house", fullHouse)
     }
 
     // Emit one status per catalog entry, in catalog order.

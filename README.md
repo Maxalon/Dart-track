@@ -125,14 +125,17 @@ is a legal 3-dart score), with no network, accounts or ads involved.
   views — such as a 3-dart-average **trend over time** and **head-to-head**
   comparisons — as they become available, and links to that player's
   **achievements** (below).
-- **Achievements** — a board of 16 milestones, computed purely from a player's
+- **Achievements** — a board of 31 milestones, computed purely from a player's
   game history and reached from the Player Stats screen. They span overall
-  dedication (play 10 / 50 / 100 games, win 25, win 3 in a row, win in 5
-  different modes), X01 feats (a 100+ visit, a maximum 180, a 100+ or the 170
-  "Big Fish" checkout, an 18-dart-or-fewer leg) and practice feats (an instant
-  Shanghai win, an Around the Clock win, "Last One Standing" for winning a game
-  of Killer, "Treasure Island" for winning a game of Bermuda), grouped by
-  category with progress bars for the tiered ones.
+  dedication (play 10 / 50 / 100 games, win 25, win 3 in a row, win in / play
+  every mode), X01 feats (a 100+ visit, a maximum 180, a 100+ or the 170
+  "Big Fish" checkout, an 18-dart-or-fewer leg), CPU-opponent scalps, and
+  per-mode feats — an instant Shanghai win, an Around the Clock win, "Marksman"
+  (win Cricket), "Half Measures" (win Half-It), "Last One Standing" / the
+  flawless "Untouchable" (win Killer, the latter without losing a life),
+  "Treasure Island" / "Treasure Hunter" (win / score 250+ in Bermuda), and
+  "Full House" (play all 14 modes) — grouped by category with progress bars for
+  the tiered ones.
 - **Leaderboards** — cross-player rankings reached from Home, one card per
   category: most wins, most games, win %, best X01 3-dart average, most 180s,
   best checkout %, and fewest darts to finish a leg. Each cell is read straight
