@@ -69,8 +69,8 @@ import java.util.UUID
  * What a single seat is filled with on the setup screen. A seat is either a
  * registered [Human] player (possibly not yet chosen, hence the nullable
  * [Player]) or a [Cpu] opponent at a fixed [BotLevel]. CPU seats are only
- * offered for X01 / Count-Up (see [NewGameScreen]); for every other mode the
- * seat list only ever holds [Human]s.
+ * offered for X01 / Count-Up / Cricket (see [NewGameScreen]); for every other
+ * mode the seat list only ever holds [Human]s.
  */
 private sealed interface SeatChoice {
     data class Human(val player: Player?) : SeatChoice
@@ -122,8 +122,9 @@ fun NewGameScreen(
     val seats = remember {
         mutableStateListOf<SeatChoice>(SeatChoice.Human(null), SeatChoice.Human(null))
     }
-    // CPU seats only make sense for the two solo-friendly scoring modes.
-    val botsAllowed = mode == GameMode.X01 || mode == GameMode.COUNT_UP
+    // CPU seats only make sense for the solo-friendly scoring modes.
+    val botsAllowed = mode == GameMode.X01 || mode == GameMode.COUNT_UP ||
+        mode == GameMode.CRICKET
 
     // Switching to a mode that doesn't support CPU opponents must not silently
     // carry bot seats over: revert any CPU seat back to an empty human seat so

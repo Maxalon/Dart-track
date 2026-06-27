@@ -156,8 +156,14 @@ class GameViewModel(
                 applyCountUpTurn(bot.countUpVisit())
                 true
             }
-            // CPU seats are only offered for X01 / Count-Up; other modes never
-            // carry a bot seat, so there is nothing to auto-play.
+            is CricketState -> {
+                // The bot builds a 3-dart Cricket visit (marks per target) and it
+                // goes through the same applyTurn a human's scoring does.
+                applyCricketTurn(bot.cricketVisit(state, state.currentPlayerIndex))
+                true
+            }
+            // CPU seats are only offered for X01 / Count-Up / Cricket; other modes
+            // never carry a bot seat, so there is nothing to auto-play.
             else -> false
         }
     }

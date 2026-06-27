@@ -28,7 +28,7 @@ Gotcha and Killer are the competitive games; the rest form a **practice suite**.
   An optional **Cut-Throat** variant (a setup toggle): once you've closed a
   target, your extra marks on it are charged as points **against** every
   opponent who hasn't closed it yet, and the **lowest** score wins — turning the
-  scoring game into a defensive one.
+  scoring game into a defensive one. A seat can be a **CPU opponent** (see below).
 - **Half-It** — 9 fixed rounds (15, 16, any double, 17, 18, any triple, 19, 20,
   bullseye). You enter the points scored on each round's target; score 0 in a
   round and your running total is halved (rounded down). Highest total wins.
@@ -92,18 +92,23 @@ Gotcha and Killer are the competitive games; the rest form a **practice suite**.
 
 ### CPU opponent
 
-In **X01** and **Count-Up**, any seat on the New Game screen can be made a
-**CPU** instead of a registered player, at one of four difficulties — **Easy**,
-**Medium**, **Hard** or **Pro** — anchored to real 3-dart averages (roughly 40 /
-60 / 80 / 100). You can mix humans and CPUs in the same game (at least one human
-seat is required). When it's a CPU's turn the app plays it automatically after a
-short pause; the bot's visit goes through the exact same scoring, persistence and
-undo path a human turn does, so its rules are identical. On a finish the bot
-attempts the checkout with a skill-scaled success rate.
+In **X01**, **Count-Up** and **Cricket**, any seat on the New Game screen can be
+made a **CPU** instead of a registered player, at one of four difficulties —
+**Easy**, **Medium**, **Hard** or **Pro** — anchored to real 3-dart averages
+(roughly 40 / 60 / 80 / 100). You can mix humans and CPUs in the same game (at
+least one human seat is required). When it's a CPU's turn the app plays it
+automatically after a short pause; the bot's visit goes through the exact same
+scoring, persistence and undo path a human turn does, so its rules are identical.
+On an X01 finish the bot attempts the checkout with a skill-scaled success rate.
+In **Cricket** the bot closes its numbers cheapest-first — grinding the
+highest-value open number (20, then 19, …) until it's closed before moving down —
+and once everything's shut it switches to **scoring** on the numbers an opponent
+hasn't closed yet. Higher levels land more marks per visit (Easy ~1.7, Pro ~5.0).
 
-The opponent is a small, **fully offline, on-device** statistical model: each
-visit is built dart-by-dart from real board segments (so every total it produces
-is a legal 3-dart score), with no network, accounts or ads involved.
+The opponent is the same small, **fully offline, on-device** statistical model
+for every mode: each visit is built dart-by-dart from real board segments (so an
+X01/Count-Up total is always a legal 3-dart score, and a Cricket visit is always
+0-9 marks), with no network, accounts or ads involved.
 
 ## Players & stats
 
@@ -114,8 +119,9 @@ is a legal 3-dart score), with no network, accounts or ads involved.
 - **Per-seat picker (required)** — the New Game screen gives each of the 1-4
   seats a searchable picker over registered players (you can also create a new
   player inline). A seat can't repeat a player already chosen in another seat,
-  and a game can't start until every seat is filled. In X01 and Count-Up a seat
-  can instead be a **CPU** opponent; a game still needs at least one human seat.
+  and a game can't start until every seat is filled. In X01, Count-Up and
+  Cricket a seat can instead be a **CPU** opponent; a game still needs at least
+  one human seat.
 - **Per-player stats screen** — pick a player to see their numbers across all
   games: games played / won / win %, and for X01 a deep breakdown — 3-dart
   average, first-9 average, checkout %, 180s and ton+ counts (100+/140+), best
@@ -220,13 +226,13 @@ by the screen that consumes it, so what you set here takes effect.
   3. creates a git tag `v0.1.<count>` and a GitHub Release with the APK attached
      as `dart-track-0.1.<count>.apk`.
 
-Unit tests live under `app/src/test/` — roughly **567** JVM tests — and cover
+Unit tests live under `app/src/test/` — roughly **590** JVM tests — and cover
 the game-mode rules of every mode (X01 bust/finish/undo and stat math, Cricket
 scoring/win conditions including Cut-Throat, Half-It halving, Killer's
 arm/drain/self-kill knockout and draw logic, Bermuda's target ladder and
 halving, Count-Up, Checkout Trainer, Baseball, Golf, Gotcha and the rest of the
-practice suite), the **CPU opponent** (its calibration and X01/Count-Up
-integration), the **sound/haptic feedback** module (its event mapping and
+practice suite), the **CPU opponent** (its calibration and X01/Count-Up/Cricket
+integration, including full bot-vs-bot Cricket games), the **sound/haptic feedback** module (its event mapping and
 procedural tone specs), **achievements**, **leaderboards & records**,
 **settings** encode/decode, the player registry, and JSON persistence
 round-trips. Run them with `./gradlew :app:testDebugUnitTest`.

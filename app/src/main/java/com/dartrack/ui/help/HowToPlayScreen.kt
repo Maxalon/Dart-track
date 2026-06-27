@@ -76,7 +76,8 @@ fun HowToPlayScreen(onBack: () -> Unit) {
                     "number, extra marks on it score its value while any opponent is still " +
                     "open. Close everything with the lead and you win. The optional " +
                     "Cut-Throat variant flips this: your extra marks are charged against " +
-                    "opponents instead, and the lowest score wins.",
+                    "opponents instead, and the lowest score wins. A seat can be a CPU " +
+                    "opponent.",
             )
             ModeCard(
                 "Half-It",
@@ -174,11 +175,13 @@ fun HowToPlayScreen(onBack: () -> Unit) {
             SectionHeader("More")
             ModeCard(
                 "CPU opponents",
-                "In X01 and Count-Up, any seat can be a CPU instead of a registered player, at " +
-                    "Easy, Medium, Hard or Pro difficulty (anchored to roughly 40 / 60 / 80 / 100 " +
-                    "three-dart averages). Mix humans and CPUs freely — a game just needs at " +
-                    "least one human seat. The bot plays automatically and scores through the exact " +
-                    "same path you do.",
+                "In X01, Count-Up and Cricket, any seat can be a CPU instead of a registered " +
+                    "player, at Easy, Medium, Hard or Pro difficulty (anchored to roughly " +
+                    "40 / 60 / 80 / 100 three-dart averages). Mix humans and CPUs freely — a game " +
+                    "just needs at least one human seat. The bot plays automatically and scores " +
+                    "through the exact same path you do. In Cricket it's the same offline " +
+                    "on-device model: it closes its numbers cheapest-first (highest value first) " +
+                    "and switches to scoring once it's ahead.",
             )
             ModeCard(
                 "Stats & achievements",
