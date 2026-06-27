@@ -1,6 +1,9 @@
 package com.dartrack.model.bot
 
+import com.dartrack.model.CRICKET_MARKS_TO_CLOSE
+import com.dartrack.model.CRICKET_TARGETS
 import com.dartrack.model.Checkout
+import com.dartrack.model.CricketState
 import kotlinx.serialization.Serializable
 import kotlin.random.Random
 
@@ -232,6 +235,137 @@ class DartsBot(val level: BotLevel, private val rng: Random) {
         val meanLow = lowMissSingles.average()
         val perDart = 60.0 * trebleHitProb + 20.0 * pStay + meanNbr * pNbr + meanLow * pLow
         return 3.0 * perDart
+    }
+
+    // -------------------------------------------------------------------- cricket
+
+    /**
+     * Per-dart **mark strike rate** for Cricket — the model's single calibration
+     * knob for this game, mirroring how [trebleHitProb] is the one knob for the
+     * scoring core. It is the probability that a dart aimed at the bot's chosen
+     * Cricket target actually lands somewhere in that number's wedge (a single,
+     * double or triple of it). The complement is a complete miss (0 marks).
+     *
+     * Chosen so the expected marks per 3-dart visit climbs cleanly with skill —
+     * see [expectedCricketMarksPerVisit] for the closed-form values:
+     *
+     *  - EASY   0.34 → ~1.7 marks/visit (a casual thrower barely closes a number a turn)
+     *  - MEDIUM 0.60 → ~3.1 marks/visit (a number closed most turns)
+     *  - HARD   0.80 → ~4.1 marks/visit
+     *  - PRO    0.98 → ~5.0 marks/visit (a strong turn that often closes a number with marks to spare)
+     *
+     * These are deliberately *below* the theoretical ceiling of 9: even a pro
+     * sprays the occasional dart, and aiming switches mid-visit as numbers close.
+     */
+    private val cricketMarkHitProb: Double = when (level) {
+        BotLevel.EASY -> 0.34
+        BotLevel.MEDIUM -> 0.60
+        BotLevel.HARD -> 0.80
+        BotLevel.PRO -> 0.98
+    }
+
+    /**
+     * When a Cricket dart DOES land in the aimed number, how the hit splits across
+     * single / double / triple of that number. Calibrated so that **single is the
+     * most common hit and triple the rarest** (a believable real-board spread:
+     * the fat single bed is far easier to catch than the thin treble ring), while
+     * still giving the higher levels enough trebles to be productive. These
+     * weights are skill-independent; only [cricketMarkHitProb] scales with level,
+     * keeping the model a single-knob calibration like the scoring core.
+     *
+     * Mean marks PER LANDED dart = 1·0.50 + 2·0.30 + 3·0.20 = 1.7.
+     */
+    private val cricketSingleWeight = 0.50
+    private val cricketDoubleWeight = 0.30
+    private val cricketTripleWeight = 0.20
+
+    /**
+     * Resolve ONE Cricket dart aimed at a target into the number of marks it
+     * adds (0..3). With probability [cricketMarkHitProb] the dart catches the
+     * number and yields single (1) / double (2) / triple (3) marks per the
+     * [cricketSingleWeight]/[cricketDoubleWeight]/[cricketTripleWeight] split;
+     * otherwise it misses for 0 marks. All randomness flows through [rng].
+     */
+    private fun cricketDartMarks(): Int {
+        if (rng.nextDouble() >= cricketMarkHitProb) return 0 // missed the number entirely
+        val r = rng.nextDouble()
+        return when {
+            r < cricketSingleWeight -> 1
+            r < cricketSingleWeight + cricketDoubleWeight -> 2
+            else -> 3
+        }
+    }
+
+    /**
+     * Pick the target this dart should aim at, given the bot's OWN running
+     * cumulative marks this visit ([myMarks]) and the full [state] (to know which
+     * numbers opponents have already closed, so extra marks would actually score).
+     *
+     * Priority — a believable, non-optimal heuristic:
+     *  1. **Close your numbers, highest value first.** The first target in
+     *     [CRICKET_TARGETS] order (20,19,18,17,16,15,25) the bot has not yet
+     *     closed (running marks < 3). This makes the bot grind 20 → 19 → … down.
+     *  2. **Score when fully closed.** If the bot has closed everything, aim at
+     *     the highest-value target it has closed but at least one opponent has
+     *     NOT, so the extra marks bank points.
+     *  3. **Harmless fallback.** If the whole board is closed by everyone (no way
+     *     to score), aim at 20 — a wasted dart that changes nothing.
+     */
+    private fun cricketAimTarget(state: CricketState, playerIndex: Int, myMarks: Map<Int, Int>): Int {
+        // 1. Highest-value still-open number for the bot.
+        CRICKET_TARGETS.firstOrNull { (myMarks[it] ?: 0) < CRICKET_MARKS_TO_CLOSE }?.let { return it }
+
+        // 2. Everything closed: aim where extra marks still score points.
+        CRICKET_TARGETS.firstOrNull { target ->
+            val opponentStillOpen = state.perPlayer.indices.any { idx ->
+                idx != playerIndex && !state.perPlayer[idx].isClosed(target)
+            }
+            opponentStillOpen
+        }?.let { return it }
+
+        // 3. Board fully closed everywhere: a harmless dart.
+        return 20
+    }
+
+    /**
+     * The marks this [DartsBot] adds on one 3-dart Cricket visit, keyed by target
+     * (only positive entries, keys ⊆ [CRICKET_TARGETS], total in 0..9 — exactly
+     * what [CricketState.applyTurn] accepts).
+     *
+     * Built **dart by dart**: the aimed target is re-chosen for every dart from
+     * the bot's marks *updated as this visit lands*, via [cricketAimTarget]. That
+     * means once a dart closes a number the next dart immediately moves on instead
+     * of wasting marks on it — the same "don't throw at a closed number" instinct
+     * a real player has. Each dart's marks come from [cricketDartMarks]. Pure and
+     * deterministic: identical [state]/[playerIndex] under an equally-seeded [rng]
+     * yields an identical visit.
+     */
+    fun cricketVisit(state: CricketState, playerIndex: Int): Map<Int, Int> {
+        // Local running tally of the bot's own marks, seeded from its history and
+        // advanced as each of this visit's darts lands.
+        val myMarks = state.perPlayer[playerIndex].cumulativeMarks().toMutableMap()
+        val added = HashMap<Int, Int>()
+        repeat(3) {
+            val target = cricketAimTarget(state, playerIndex, myMarks)
+            val marks = cricketDartMarks()
+            if (marks > 0) {
+                myMarks[target] = (myMarks[target] ?: 0) + marks
+                added[target] = (added[target] ?: 0) + marks
+            }
+        }
+        return added
+    }
+
+    /**
+     * Closed-form expected marks per 3-dart Cricket visit for this level (no
+     * sampling), used by tests to lock the calibration and its monotonicity.
+     * Each dart independently contributes [cricketMarkHitProb] × (mean marks per
+     * landed dart = 1.7), and a visit is three such darts.
+     */
+    fun expectedCricketMarksPerVisit(): Double {
+        val meanPerLanded =
+            1.0 * cricketSingleWeight + 2.0 * cricketDoubleWeight + 3.0 * cricketTripleWeight
+        return 3.0 * cricketMarkHitProb * meanPerLanded
     }
 
     companion object {
