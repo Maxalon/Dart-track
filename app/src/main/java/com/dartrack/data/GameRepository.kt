@@ -3,6 +3,7 @@ package com.dartrack.data
 import android.content.Context
 import com.dartrack.model.AroundTheClockState
 import com.dartrack.model.BaseballState
+import com.dartrack.model.BermudaState
 import com.dartrack.model.BobsTwentySevenState
 import com.dartrack.model.Catch40State
 import com.dartrack.model.CountUpState
@@ -175,6 +176,7 @@ fun GameState.withPlayers(players: List<GamePlayer>): GameState = when (this) {
     is GolfState -> copy(players = players)
     is GotchaState -> copy(players = players)
     is KillerState -> copy(players = players)
+    is BermudaState -> copy(players = players)
 }
 
 /** A game record paired with whether [reassignPlayerInRecords] changed it. */

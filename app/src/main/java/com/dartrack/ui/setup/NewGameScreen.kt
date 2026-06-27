@@ -48,6 +48,7 @@ import com.dartrack.model.GameMode
 import com.dartrack.model.GamePlayer
 import com.dartrack.model.AroundTheClockState
 import com.dartrack.model.BaseballState
+import com.dartrack.model.BermudaState
 import com.dartrack.model.BobsTwentySevenState
 import com.dartrack.model.Catch40State
 import com.dartrack.model.CountUpState
@@ -168,6 +169,7 @@ fun NewGameScreen(
                         GameMode.GOLF -> "Golf"
                         GameMode.GOTCHA -> "Gotcha"
                         GameMode.KILLER -> "Killer"
+                        GameMode.BERMUDA -> "Bermuda"
                     }) },
                 )
             }
@@ -366,6 +368,7 @@ fun NewGameScreen(
                         GameMode.GOLF -> GolfState.new(gamePlayers)
                         GameMode.GOTCHA -> GotchaState.new(gamePlayers)
                         GameMode.KILLER -> KillerState.new(gamePlayers, killerLives)
+                        GameMode.BERMUDA -> BermudaState.new(gamePlayers)
                     }
                     val now = System.currentTimeMillis()
                     val record = GameRecord(

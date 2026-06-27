@@ -2,6 +2,7 @@ package com.dartrack.data
 
 import com.dartrack.model.AroundTheClockState
 import com.dartrack.model.BaseballState
+import com.dartrack.model.BermudaState
 import com.dartrack.model.BobsTwentySevenState
 import com.dartrack.model.Catch40State
 import com.dartrack.model.CountUpState
@@ -77,6 +78,7 @@ data class ModeSummary(
      * "Best result" for this mode, interpreted per-mode (0 when not applicable):
      *  - Cricket: games won (mirrors [gamesWon]).
      *  - Half-It: highest final total reached in any game.
+     *  - Bermuda: highest final total reached in any game.
      *  - Shanghai: highest final total reached in any game.
      *  - Bob's 27: highest final score reached in any game.
      *  - Catch 40: highest final score reached in any game.
@@ -123,6 +125,7 @@ data class PlayerStatsData(
     // Per-mode summaries.
     val cricket: ModeSummary,
     val halfIt: ModeSummary,
+    val bermuda: ModeSummary,
     val aroundTheClock: ModeSummary,
     val bobs27: ModeSummary,
     val shanghai: ModeSummary,
@@ -184,6 +187,7 @@ fun playerStats(playerId: String, games: List<GameRecord>): PlayerStatsData {
 
     var cricketPlayed = 0; var cricketWon = 0
     var halfItPlayed = 0; var halfItWon = 0; var halfItHigh = 0
+    var bermudaPlayed = 0; var bermudaWon = 0; var bermudaHigh = 0
     var atcPlayed = 0; var atcWon = 0; var atcBestDarts = 0
     var bobsPlayed = 0; var bobsWon = 0; var bobsHigh = 0
     var shanghaiPlayed = 0; var shanghaiWon = 0; var shanghaiHigh = 0
@@ -337,6 +341,11 @@ fun playerStats(playerId: String, games: List<GameRecord>): PlayerStatsData {
                     killerPlayed++
                     if (won) killerWon++
                 }
+                is BermudaState -> {
+                    bermudaPlayed++
+                    if (won) bermudaWon++
+                    bermudaHigh = maxOf(bermudaHigh, s.perPlayer[idx].total)
+                }
             }
         }
     }
@@ -386,6 +395,7 @@ fun playerStats(playerId: String, games: List<GameRecord>): PlayerStatsData {
         ),
         cricket = ModeSummary(cricketPlayed, cricketWon, best = cricketWon),
         halfIt = ModeSummary(halfItPlayed, halfItWon, best = halfItHigh),
+        bermuda = ModeSummary(bermudaPlayed, bermudaWon, best = bermudaHigh),
         aroundTheClock = ModeSummary(atcPlayed, atcWon, best = atcBestDarts),
         bobs27 = ModeSummary(bobsPlayed, bobsWon, best = bobsHigh),
         shanghai = ModeSummary(shanghaiPlayed, shanghaiWon, best = shanghaiHigh),

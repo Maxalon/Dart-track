@@ -10,6 +10,7 @@ import com.dartrack.model.GamePlayer
 import com.dartrack.model.GameState
 import com.dartrack.model.AroundTheClockState
 import com.dartrack.model.BaseballState
+import com.dartrack.model.BermudaState
 import com.dartrack.model.BobsTwentySevenState
 import com.dartrack.model.Catch40State
 import com.dartrack.model.CountUpState
@@ -223,6 +224,10 @@ class GameViewModel(
     fun applyKillerTurn(hits: List<Int>) = mutate { (it as KillerState).applyTurn(hits) }
 
     fun undoKiller() = mutate { (it as KillerState).undoLast() }
+
+    fun applyBermudaTurn(points: Int) = mutate { (it as BermudaState).applyTurn(points) }
+
+    fun undoBermuda() = mutate { (it as BermudaState).undoLast() }
 
     class Factory(
         private val repo: GameRepository,

@@ -4,6 +4,7 @@ import com.dartrack.model.GameMode
 import com.dartrack.model.GameState
 import com.dartrack.model.AroundTheClockState
 import com.dartrack.model.BaseballState
+import com.dartrack.model.BermudaState
 import com.dartrack.model.BobsTwentySevenState
 import com.dartrack.model.Catch40State
 import com.dartrack.model.CountUpState
@@ -109,4 +110,5 @@ fun GameState.toMode(): GameMode = when (this) {
     is GolfState -> GameMode.GOLF
     is GotchaState -> GameMode.GOTCHA
     is KillerState -> GameMode.KILLER
+    is BermudaState -> GameMode.BERMUDA
 }

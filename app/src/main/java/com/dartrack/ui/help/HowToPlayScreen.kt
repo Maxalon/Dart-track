@@ -163,6 +163,13 @@ fun HowToPlayScreen(onBack: () -> Unit) {
                     "your lives and you're out — last player standing wins. Each turn, tap the " +
                     "double you hit for each of your (up to 3) darts.",
             )
+            ModeCard(
+                "Bermuda",
+                "1-4 players, 12 rounds on a fixed ladder of targets: 12, 13, 14, any Double, " +
+                    "15, 16, 17, any Triple, 18, 19, 20, Bull. Each round you throw 3 darts at " +
+                    "the round's target and enter the points you scored on it. Score 0 in a round " +
+                    "and your running total is HALVED. Highest total after all 12 targets wins.",
+            )
 
             SectionHeader("More")
             ModeCard(

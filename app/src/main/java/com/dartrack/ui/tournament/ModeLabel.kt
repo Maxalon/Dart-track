@@ -21,4 +21,5 @@ internal fun modeLabel(mode: GameMode): String = when (mode) {
     GameMode.GOLF -> "Golf"
     GameMode.GOTCHA -> "Gotcha"
     GameMode.KILLER -> "Killer"
+    GameMode.BERMUDA -> "Bermuda"
 }

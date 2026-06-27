@@ -23,6 +23,7 @@ import com.dartrack.data.achievementsFor
 import com.dartrack.ui.achievements.AchievementsScreen
 import com.dartrack.ui.game.AroundTheClockScreen
 import com.dartrack.ui.game.BaseballScreen
+import com.dartrack.ui.game.BermudaScreen
 import com.dartrack.ui.game.BobsTwentySevenScreen
 import com.dartrack.ui.game.Catch40Screen
 import com.dartrack.ui.game.CountUpScreen
@@ -184,6 +185,10 @@ fun AppRoot() {
                     onExit = { nav.popBackStack("home", inclusive = false) },
                 )
                 com.dartrack.model.GameMode.KILLER -> KillerScreen(
+                    recordId = id,
+                    onExit = { nav.popBackStack("home", inclusive = false) },
+                )
+                com.dartrack.model.GameMode.BERMUDA -> BermudaScreen(
                     recordId = id,
                     onExit = { nav.popBackStack("home", inclusive = false) },
                 )

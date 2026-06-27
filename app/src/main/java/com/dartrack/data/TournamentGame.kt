@@ -2,6 +2,7 @@ package com.dartrack.data
 
 import com.dartrack.model.AroundTheClockState
 import com.dartrack.model.BaseballState
+import com.dartrack.model.BermudaState
 import com.dartrack.model.BobsTwentySevenState
 import com.dartrack.model.Catch40State
 import com.dartrack.model.CheckoutTrainerState
@@ -39,7 +40,7 @@ import com.dartrack.model.X01State
  *  - **Gotcha** -> race to 301;
  *  - every other mode -> its plain `.new(players)` (no extra knobs to set).
  *
- * The `when` is exhaustive over all 13 [GameMode]s (no `else`) so adding a mode
+ * The `when` is exhaustive over all 14 [GameMode]s (no `else`) so adding a mode
  * is a compile error here until it is wired up. Pure.
  */
 fun defaultStateForMode(mode: GameMode, players: List<GamePlayer>): GameState = when (mode) {
@@ -56,6 +57,7 @@ fun defaultStateForMode(mode: GameMode, players: List<GamePlayer>): GameState = 
     GameMode.GOLF -> GolfState.new(players)
     GameMode.GOTCHA -> GotchaState.new(players, target = 301)
     GameMode.KILLER -> KillerState.new(players)
+    GameMode.BERMUDA -> BermudaState.new(players)
 }
 
 /**

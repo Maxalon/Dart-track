@@ -3,6 +3,7 @@ package com.dartrack.data
 import com.dartrack.model.GameMode
 import com.dartrack.model.AroundTheClockState
 import com.dartrack.model.BaseballState
+import com.dartrack.model.BermudaState
 import com.dartrack.model.BobsTwentySevenState
 import com.dartrack.model.Catch40State
 import com.dartrack.model.CountUpState
@@ -221,6 +222,7 @@ object StatsAggregator {
                 // exhaustive (see playerStats for the id-keyed summary).
                 is GotchaState -> {}
                 is KillerState -> {}
+                is BermudaState -> {}
             }
         }
 
