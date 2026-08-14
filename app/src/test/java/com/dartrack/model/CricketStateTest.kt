@@ -84,6 +84,20 @@ class CricketStateTest {
     }
 
     @Test
+    fun scoring_pointsAlreadyEarnedSurviveOpponentClosing() {
+        // Regression: points are banked when the darts are thrown. A scores 40
+        // on 20 while B is open; B closing 20 afterwards must NOT wipe them —
+        // it only stops A from scoring MORE on 20.
+        var s = game("A", "B")
+        s = s.applyTurn(mapOf(20 to 5)) // A: closes 20 + 2 extra -> 40 pts
+        assertEquals(40, s.scoreFor(0))
+        s = s.applyTurn(mapOf(20 to 3)) // B closes 20
+        assertEquals(40, s.scoreFor(0), "B closing 20 must not erase A's banked points")
+        s = s.applyTurn(mapOf(20 to 2)) // A: further marks after B closed -> no new points
+        assertEquals(40, s.scoreFor(0), "no NEW points once every opponent has closed")
+    }
+
+    @Test
     fun scoring_marksAtExactlyThreeScoreNothing() {
         var s = game("A", "B")
         s = s.applyTurn(mapOf(20 to 3)) // exactly closed, no extra
@@ -127,13 +141,10 @@ class CricketStateTest {
 
     @Test
     fun win_blockedWhenAllClosedButTrailing() {
-        // "Closed all but trailing -> no win" needs THREE players: because
-        // scoreFor() recomputes live and a target stops scoring once every
-        // opponent has closed it, a 2-player game can never reach this state
-        // (closing the last target zeroes the opponent's points on it). Here a
-        // third player (C) keeps target 20 open, so B's 60 points persist even
-        // after A closes 20. A closes all 7 targets but trails B -> A must NOT
-        // win yet. State is built directly to set up the exact pre-win position.
+        // A closes all 7 targets but trails B on points -> A must NOT win yet.
+        // B earned 60 on target 20 while opponents were open; those points are
+        // banked and survive A closing 20. State is built directly to set up
+        // the exact pre-win position.
         val a = CricketPlayerState(
             GamePlayer("A"),
             turns = listOf(20, 19, 18, 17, 16, 25).map { CricketTurn(mapOf(it to 3)) },
@@ -253,13 +264,14 @@ class CricketStateTest {
 
     @Test
     fun cutThroat_win_whenAllClosedAndStrictlyLowest() {
-        // Three players. A is about to close its last number (18). B is open on 20
-        // and carries a penalty C handed out there, so B sits at 60 while A will
-        // be 0. When A closes 18 it has closed-all AND is strictly below B -> wins.
+        // Three players. A closed 20 before C's excess landed there, so only B
+        // (still open on 20) carries C's 60-point penalty. A is about to close
+        // its last two numbers (18 and 15); doing so leaves it closed-all at 0,
+        // strictly below B's 60 -> wins.
         val a = CricketPlayerState(
             GamePlayer("A"),
-            turns = listOf(19, 17, 16, 15, 25).map { CricketTurn(mapOf(it to 3)) },
-        ) // A closed five; still OPEN on 20 and 18
+            turns = listOf(20, 19, 17, 16, 25).map { CricketTurn(mapOf(it to 3)) },
+        ) // A closed five (20 among them, FIRST); still OPEN on 18 and 15
         val b = CricketPlayerState(
             GamePlayer("B"),
             turns = listOf(CricketTurn(mapOf(19 to 3))), // B closed 19 only -> open on 20
@@ -267,33 +279,31 @@ class CricketStateTest {
         val c = CricketPlayerState(
             GamePlayer("C"),
             turns = listOf(CricketTurn(mapOf(20 to 3)), CricketTurn(mapOf(20 to 3))),
-        ) // C: 6 marks on 20 -> open players (A,B) charged (6-3)*20 = 60 each
+        ) // C: 6 marks on 20 -> players open on 20 at that moment charged (6-3)*20 = 60
         val s = CricketState(
             players = listOf(a.player, b.player, c.player),
             perPlayer = listOf(a, b, c),
             currentPlayerIndex = 0, // A to throw
             cutThroat = true,
         )
-        assertEquals(60, s.scoreFor(0), "A still open on 20 -> charged 60")
-        assertEquals(60, s.scoreFor(1), "B still open on 20 -> charged 60")
-        // A closes 20 (drops its own 60) and 18 (its last) in one turn -> closed-all
-        // with score 0, while B remains open on 20 and keeps the 60 penalty.
-        val after = s.applyTurn(mapOf(20 to 3, 18 to 3))
+        assertEquals(0, s.scoreFor(0), "A had already closed 20 -> never charged")
+        assertEquals(60, s.scoreFor(1), "B open on 20 when C threw -> charged 60")
+        // A closes 18 and 15 (its last two) in one turn -> closed-all at 0,
+        // strictly below B's 60.
+        val after = s.applyTurn(mapOf(18 to 3, 15 to 3))
         assertTrue(after.perPlayer[0].hasClosedAll(), "A has closed all targets")
-        assertEquals(0, after.scoreFor(0), "A closed everything -> no open number to be penalised on")
-        assertEquals(60, after.scoreFor(1), "B still open on 20 -> still carries 60")
+        assertEquals(0, after.scoreFor(0))
+        assertEquals(60, after.scoreFor(1), "B still carries the 60 penalty")
         assertTrue(after.isFinished, "A closed all and is strictly lowest -> win")
         assertEquals(listOf(0), after.winnerIndices)
     }
 
     @Test
-    fun cutThroat_closingAllZeroesYourScore_soClosingPlayerNeverTrails() {
-        // Cut-throat invariant: you are only penalised on numbers you have NOT
-        // closed, so a player who has closed ALL of them is open on nothing and
-        // therefore always sits at the minimum possible score (0). This is the
-        // cut-throat analogue of "leads/ties" — the closer can never be strictly
-        // above an opponent. Built directly from a heavily-penalised position to
-        // show the penalty fully evaporates the instant the last number closes.
+    fun cutThroat_penaltiesArePermanent_closingDoesNotEraseThem() {
+        // Regression (mirror of the standard-mode banked-points bug): penalties
+        // are charged when the darts are thrown and are permanent. Closing the
+        // number afterwards — even closing ALL numbers — must not erase them,
+        // so a heavily-penalised player cannot launder their score by closing.
         val a = CricketPlayerState(
             GamePlayer("A"),
             turns = listOf(20, 19, 18, 17, 16, 25).map { CricketTurn(mapOf(it to 3)) },
@@ -309,13 +319,14 @@ class CricketStateTest {
             cutThroat = true,
         )
         assertEquals(45, s.scoreFor(0), "A open on 15 -> charged B's excess")
-        // A closes 15 -> now closed-all; A is open on nothing -> score 0, and
-        // wins as the lowest (B is also 0 here -> tie, allowed).
+        // A closes 15 -> closed-all, but the 45 already charged stays. B sits
+        // at 0, so A trails (lowest wins) and the win must be blocked.
         val after = s.applyTurn(mapOf(15 to 3))
         assertTrue(after.perPlayer[0].hasClosedAll(), "A has closed all targets")
-        assertEquals(0, after.scoreFor(0), "closing all leaves no open number to be penalised on")
-        assertTrue(after.isFinished)
-        assertEquals(listOf(0), after.winnerIndices)
+        assertEquals(45, after.scoreFor(0), "closing 15 does not erase the banked penalty")
+        assertEquals(0, after.scoreFor(1))
+        assertFalse(after.isFinished, "closed-all but not lowest -> no win")
+        assertTrue(after.winnerIndices.isEmpty())
     }
 
     @Test
