@@ -58,47 +58,73 @@ data class CricketState(
 ) : GameState {
 
     /**
-     * Score is computed per target. Standard: if you've closed it (>=3 marks)
-     * and at least one opponent has not, every additional mark on it counts as
-     * (target × marks-past-3) points for YOU. Cut-throat inverts this: those
-     * excess points are charged AGAINST you for every target an opponent has
-     * closed while you have not — i.e. you receive the points opponents "give
-     * away" — and the lowest total wins.
+     * Score is computed per target. Standard: once you've closed it (>=3
+     * marks), every additional mark thrown while at least one opponent is
+     * still open counts as (target × marks-past-3) points for YOU. Cut-throat
+     * inverts this: a thrower's excess marks are charged AGAINST every
+     * opponent still open on that target — and the lowest total wins.
+     *
+     * Points are banked at the moment the darts are thrown: an opponent
+     * closing a target later stops FUTURE scoring on it but never removes
+     * points already earned (and in cut-throat, closing a target never erases
+     * penalties already received). Scores are therefore computed by replaying
+     * turns in throw order, which round-robin play makes reconstructible:
+     * turn r of player p happens after turn r of every lower-indexed player
+     * and after turn r-1 of every higher-indexed player.
      */
     fun scoreFor(playerIndex: Int): Int =
         if (cutThroat) cutThroatScoreFor(playerIndex) else standardScoreFor(playerIndex)
 
+    /** Marks [playerIdx] had on [target] when [throwerIndex] began turn [round]. */
+    private fun marksWhenThrown(playerIdx: Int, target: Int, throwerIndex: Int, round: Int): Int {
+        val turnsSeen = if (playerIdx < throwerIndex) round + 1 else round
+        val turns = perPlayer[playerIdx].turns
+        var marks = 0
+        for (i in 0 until minOf(turnsSeen, turns.size)) {
+            marks += turns[i].marksByTarget[target] ?: 0
+        }
+        return marks
+    }
+
     private fun standardScoreFor(playerIndex: Int): Int {
-        val me = perPlayer[playerIndex]
-        val cum = me.cumulativeMarks()
         var total = 0
-        for (target in CRICKET_TARGETS) {
-            val mine = cum[target] ?: 0
-            if (mine <= CRICKET_MARKS_TO_CLOSE) continue
-            val opponentClosed = perPlayer
-                .filterIndexed { idx, _ -> idx != playerIndex }
-                .all { it.isClosed(target) }
-            if (opponentClosed) continue
-            total += (mine - CRICKET_MARKS_TO_CLOSE) * target
+        val myMarks = mutableMapOf<Int, Int>()
+        perPlayer[playerIndex].turns.forEachIndexed { round, turn ->
+            for ((target, marks) in turn.marksByTarget) {
+                val before = myMarks[target] ?: 0
+                val after = before + marks
+                myMarks[target] = after
+                val scoringMarks = after - maxOf(before, CRICKET_MARKS_TO_CLOSE)
+                if (scoringMarks <= 0) continue
+                val allOpponentsClosed = perPlayer.indices
+                    .filter { it != playerIndex }
+                    .all { marksWhenThrown(it, target, playerIndex, round) >= CRICKET_MARKS_TO_CLOSE }
+                if (!allOpponentsClosed) total += scoringMarks * target
+            }
         }
         return total
     }
 
     /**
-     * In cut-throat, points are received from opponents: for each OTHER player
-     * who has closed a target on which I am still open, their excess marks on
-     * that target × the target value are added to MY score (a penalty).
+     * In cut-throat, points are received from opponents: replay each other
+     * player's turns and charge ME their excess marks × target value for
+     * every target I had not yet closed when those darts were thrown.
      */
     private fun cutThroatScoreFor(playerIndex: Int): Int {
-        val me = perPlayer[playerIndex]
         var total = 0
-        for (target in CRICKET_TARGETS) {
-            if (me.isClosed(target)) continue
-            perPlayer.forEachIndexed { idx, other ->
-                if (idx == playerIndex) return@forEachIndexed
-                val theirs = other.cumulativeMarks()[target] ?: 0
-                if (theirs <= CRICKET_MARKS_TO_CLOSE) return@forEachIndexed
-                total += (theirs - CRICKET_MARKS_TO_CLOSE) * target
+        perPlayer.forEachIndexed { throwerIdx, thrower ->
+            if (throwerIdx == playerIndex) return@forEachIndexed
+            val throwerMarks = mutableMapOf<Int, Int>()
+            thrower.turns.forEachIndexed { round, turn ->
+                for ((target, marks) in turn.marksByTarget) {
+                    val before = throwerMarks[target] ?: 0
+                    val after = before + marks
+                    throwerMarks[target] = after
+                    val scoringMarks = after - maxOf(before, CRICKET_MARKS_TO_CLOSE)
+                    if (scoringMarks <= 0) continue
+                    val myMarksThen = marksWhenThrown(playerIndex, target, throwerIdx, round)
+                    if (myMarksThen < CRICKET_MARKS_TO_CLOSE) total += scoringMarks * target
+                }
             }
         }
         return total
