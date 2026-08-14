@@ -98,6 +98,17 @@ class CricketStateTest {
     }
 
     @Test
+    fun scoring_sameRoundEarlierThrowCounts_noPointsAgainstAlreadyClosed() {
+        // Within a round, lower-indexed players have already thrown. A closes
+        // 20 in round 0; B's excess on 20 later in the SAME round must score
+        // nothing, because A was already closed when B threw.
+        var s = game("A", "B")
+        s = s.applyTurn(mapOf(20 to 3)) // A closes 20 (round 0)
+        s = s.applyTurn(mapOf(20 to 5)) // B, same round: closes + 2 excess
+        assertEquals(0, s.scoreFor(1), "A closed 20 earlier in the same round -> B scores nothing")
+    }
+
+    @Test
     fun scoring_marksAtExactlyThreeScoreNothing() {
         var s = game("A", "B")
         s = s.applyTurn(mapOf(20 to 3)) // exactly closed, no extra
@@ -296,6 +307,18 @@ class CricketStateTest {
         assertEquals(60, after.scoreFor(1), "B still carries the 60 penalty")
         assertTrue(after.isFinished, "A closed all and is strictly lowest -> win")
         assertEquals(listOf(0), after.winnerIndices)
+    }
+
+    @Test
+    fun cutThroat_sameRoundEarlierCloseShieldsFromPenalty() {
+        // Mirror of the same-round chronology rule: A closed 20 earlier in the
+        // same round, so B's excess there cannot be charged to A — only to C,
+        // who is still open.
+        var s = cutThroatGame("A", "B", "C")
+        s = s.applyTurn(mapOf(20 to 3)) // A closes 20 (round 0)
+        s = s.applyTurn(mapOf(20 to 6)) // B, same round: closes + 3 excess = 60
+        assertEquals(0, s.scoreFor(0), "A closed 20 before B threw -> shielded")
+        assertEquals(60, s.scoreFor(2), "C still open on 20 -> charged")
     }
 
     @Test
