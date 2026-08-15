@@ -69,6 +69,14 @@ data class TournamentCompetitor(
  *
  * [id] is a stable, schedule-derived string ("m-<round>-<i>-<j>") so a match can
  * be referenced across [recordResult] calls without depending on list position.
+ *
+ * The trailing [feedsMatchId] / [feedsSlot] fields exist ONLY for knockout
+ * brackets ([TournamentFormat.SINGLE_ELIMINATION]); round-robin fixtures leave
+ * them at their defaults (no feeder wiring). When set, the match's winner is
+ * promoted into match [feedsMatchId]'s home ([feedsSlot] == 0) or away
+ * ([feedsSlot] == 1) competitor slot — see TournamentBracket.kt. A bracket slot
+ * still awaiting its feeder holds the sentinel [TBD] index. Both default so any
+ * round-robin JSON persisted before this feature decodes unchanged.
  */
 @Serializable
 data class TournamentMatch(
@@ -79,14 +87,40 @@ data class TournamentMatch(
     val gameId: String? = null,
     val winnerIndex: Int? = null,
     val played: Boolean = false,
+    val feedsMatchId: String? = null,
+    val feedsSlot: Int = 0,
 )
 
 /**
- * The complete state of a round-robin tournament. [competitors] is fixed once
- * created (indices into it are used everywhere); [matches] is the full fixture
- * list with results filled in by [recordResult]. [pointsForWin] / [pointsForDraw]
- * drive the [standings] points total (a loss is always worth 0). [createdAtEpochMs]
- * is supplied by the caller (the pure layer never reads the clock).
+ * Sentinel competitor index for a knockout bracket slot that has no occupant yet
+ * — a later-round seat still waiting on the winner of an earlier match to feed
+ * it. It is never a real index into [TournamentState.competitors] (those are
+ * `0..size-1`), so a match with either side still [TBD] is not yet playable.
+ */
+const val TBD = -1
+
+/**
+ * How a tournament's [TournamentState.matches] are organised. [ROUND_ROBIN] is
+ * the original every-pairing-once league (see [roundRobinSchedule]); [SINGLE_ELIMINATION]
+ * is a seeded knockout bracket (see TournamentBracket.kt) where a loss ends the
+ * run. The enum is serialized by name and defaults to [ROUND_ROBIN] on the state
+ * so tournaments persisted before this field existed decode as leagues.
+ */
+@Serializable
+enum class TournamentFormat { ROUND_ROBIN, SINGLE_ELIMINATION }
+
+/**
+ * The complete state of a tournament. [competitors] is fixed once created
+ * (indices into it are used everywhere); [matches] is the full fixture list with
+ * results filled in by [recordResult] (round-robin) or [advanceBracket]
+ * (knockout). [pointsForWin] / [pointsForDraw] drive the [standings] points total
+ * (a loss is always worth 0); they are irrelevant to a knockout, which ranks by
+ * round reached rather than points. [createdAtEpochMs] is supplied by the caller
+ * (the pure layer never reads the clock).
+ *
+ * [format] is the LAST field with a [TournamentFormat.ROUND_ROBIN] default so it
+ * is purely additive: old persisted JSON without the key decodes to a league and
+ * every existing round-robin function behaves exactly as before.
  */
 @Serializable
 data class TournamentState(
@@ -98,6 +132,7 @@ data class TournamentState(
     val pointsForWin: Int = 3,
     val pointsForDraw: Int = 1,
     val createdAtEpochMs: Long = 0L,
+    val format: TournamentFormat = TournamentFormat.ROUND_ROBIN,
 )
 
 /**
