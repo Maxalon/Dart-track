@@ -35,6 +35,9 @@ import com.dartrack.data.X01_START_SCORES
  * Row + a "Back" TextButton under statusBarsPadding) and their selector/toggle
  * idioms (FilterChip rows for choices, Switch rows for booleans). Content
  * scrolls and clears the navigation bar via safe padding.
+ *
+ * [accountSection] renders the (stateful) account block at the top; it's a
+ * slot so this screen itself stays a pure function of [settings].
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -42,6 +45,7 @@ fun SettingsScreen(
     settings: Settings,
     onChange: (Settings) -> Unit,
     onBack: () -> Unit,
+    accountSection: @Composable () -> Unit = {},
 ) {
     Column(modifier = Modifier.fillMaxSize().statusBarsPadding().padding(8.dp)) {
         Row(
@@ -64,6 +68,10 @@ fun SettingsScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 8.dp),
         ) {
+            // ---- Account ------------------------------------------------------
+            SectionHeader("Account")
+            accountSection()
+
             // ---- Appearance ---------------------------------------------------
             SectionHeader("Appearance")
             Text("Theme", fontWeight = FontWeight.SemiBold)

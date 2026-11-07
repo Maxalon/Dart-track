@@ -4,6 +4,9 @@
 
     <!-- Short haptic feedback for game events (opt-in via Settings). -->
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Optional account / friends backend (darts.kontrollzentrale.de). -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <application
         android:allowBackup="true"

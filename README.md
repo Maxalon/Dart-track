@@ -6,7 +6,8 @@ per seat** when starting a game, so every game and every statistic is tied to a
 real player rather than a free-typed name. Fourteen game modes — competitive and
 practice — an optional **CPU opponent**, local game history, deep per-player
 statistics, **achievements**, cross-player **leaderboards**, app **settings**,
-and an optional voice caller. Fully offline, no ads, no accounts.
+and an optional voice caller. Fully offline, no ads; an **account** is optional
+(see below).
 
 ## Game modes
 
@@ -211,6 +212,26 @@ by the screen that consumes it, so what you set here takes effect.
     be toggled per game).
   - **X01 defaults** — the start score and double-out used to seed the New Game
     and New Tournament screens when you set up an X01 game or tournament.
+
+## Account (optional)
+
+The app works fully offline without an account. Settings → **Account** lets you
+create one or log in with a **username and password** (no email); it talks to
+the Dart-Track server at `https://darts.kontrollzentrale.de`.
+
+- Usernames are 3–20 letters, digits or `_`; passwords need at least 6
+  characters. Each device gets its own login, which **never expires** — the app
+  only logs out when you tap **Log out** (which keeps all local games and
+  players), or if the server rejects the login because an admin reset or
+  deleted the account (you'll see "You were logged out — log in again").
+- There is no in-app password recovery. If an admin resets your password, the
+  next login asks you to choose a new one.
+- Right after the first login on a device the app asks **"Which player is
+  you?"** — pick an existing local player or create one. That player keeps its
+  local name and is linked to the account; logging back in to the same account
+  reuses it. You can change it later in Settings → Account.
+- The login token is stored in app-private storage that is excluded from
+  backups (`no_backup/account.json`).
 
 ## Local data
 

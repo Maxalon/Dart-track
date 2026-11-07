@@ -20,6 +20,9 @@ android {
         targetSdk = 35
         versionCode = versionCodeProp
         versionName = versionNameProp
+        // Account / friends backend (Dart-Track-Server). Optional: the app is
+        // fully usable offline without ever talking to it.
+        buildConfigField("String", "SERVER_URL", "\"https://darts.kontrollzentrale.de\"")
     }
 
     signingConfigs {
@@ -59,6 +62,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     packaging {
         resources {
@@ -93,9 +97,11 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.kotlinx.serialization.json)
+    implementation(libs.okhttp)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlin.test.junit)
+    testImplementation(libs.okhttp.mockwebserver)
 
     debugImplementation(libs.androidx.ui.tooling)
 }
