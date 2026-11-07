@@ -2,6 +2,7 @@ package com.dartrack.data
 
 import com.dartrack.model.GamePlayer
 import com.dartrack.model.Player
+import com.dartrack.net.FriendEntry
 import com.dartrack.net.GameUpload
 import com.dartrack.net.GamesPage
 import com.dartrack.net.RemoteGame
@@ -376,4 +377,37 @@ fun recordLink(state: SyncState, friendId: String, linkId: String, gameIds: List
     val pending = state.pendingLinks.toMutableMap()
     for (id in gameIds) pending[id] = pending[id].orEmpty() + (friendId to linkId)
     return state.copy(links = state.links + (friendId to linkId), pendingLinks = pending)
+}
+
+/** What "Merge players" may do with a source/target pair (see [mergeDecision]). */
+sealed interface MergeDecision {
+    /** Two local guests: a plain local merge, as always. */
+    data object Allowed : MergeDecision
+
+    /** Guest into a friend's player: must go through the logged transfer (one guest per friend). */
+    data class Transfer(val friend: FriendEntry) : MergeDecision
+
+    data class Blocked(val message: String) : MergeDecision
+}
+
+/**
+ * Whether merging [from] into [into] may be a plain local merge. Any player
+ * linked to an account (me, a friend, a hidden synced player) carries synced
+ * history, so it can't be silently merged: a guest into an accepted friend
+ * becomes the guest → friend transfer (logged on the server so it can be
+ * undone, one guest per friend); everything else involving an account is
+ * refused. Guest → guest stays a plain merge.
+ */
+fun mergeDecision(from: Player, into: Player, friends: List<FriendEntry>): MergeDecision {
+    if (from.accountId == null && into.accountId == null) return MergeDecision.Allowed
+    if (from.accountId == null) {
+        friends.firstOrNull { it.id == into.accountId }?.let { return MergeDecision.Transfer(it) }
+        return MergeDecision.Blocked(
+            "${into.name} is linked to an account. Games can only move to an accepted friend, " +
+                "with \"Move a guest's games to a friend\" while logged in.",
+        )
+    }
+    return MergeDecision.Blocked(
+        "${from.name} is linked to an account, so their games can't be merged into another player.",
+    )
 }

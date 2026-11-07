@@ -44,7 +44,7 @@ import kotlinx.coroutines.launch
 
 /**
  * "Move a guest's games to a friend": pick a local guest and an accepted
- * friend (either may be preselected), then confirm. The guest's games move to
+ * friend (either may be preselected, e.g. from "Merge players"), then confirm. The guest's games move to
  * the friend for good — on this phone (the guest merges into the friend's
  * player) and on the server (they join the friend's history). Only one guest
  * per friend; the dialog checks that before offering to confirm.
@@ -53,6 +53,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun TransferGuestDialog(
     initialFriend: FriendEntry? = null,
+    initialGuestId: String? = null,
     onDismiss: () -> Unit,
     onDone: (String) -> Unit,
 ) {
@@ -71,7 +72,7 @@ fun TransferGuestDialog(
     val friends = friendsFor(cache, account).friends
     val guests = transferableGuests(players, account?.mePlayerId)
     var friend by remember { mutableStateOf(initialFriend) }
-    var guestId by remember { mutableStateOf<String?>(null) }
+    var guestId by remember { mutableStateOf(initialGuestId) }
     var blocked by remember { mutableStateOf<String?>(null) }
     var checking by remember { mutableStateOf(false) }
     var confirming by remember { mutableStateOf(false) }

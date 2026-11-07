@@ -290,7 +290,10 @@ be undone from the app."), the guest disappears and those games count as your
 friend's — on your phone and in their history after their next sync. From then
 on they're just a normal friend. You can do this for **one guest per friend**
 (also across your phones); a second attempt is refused with a message. Only
-accepted friends can receive games.
+accepted friends can receive games. **Manage players → Merge players** follows the same rule:
+merging a guest into a friend opens this transfer, two guests merge as before,
+and any other merge into or out of an account-linked player (you, a friend, a
+synced player) is refused.
 
 ### Stats with friends
 
