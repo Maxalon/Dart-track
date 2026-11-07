@@ -1,12 +1,16 @@
 package com.dartrack.data
 
+import com.dartrack.model.CricketState
 import com.dartrack.model.GameMode
+import com.dartrack.model.GameOptions
 import com.dartrack.model.GamePlayer
 import com.dartrack.model.GameState
 import com.dartrack.model.GolfState
 import com.dartrack.model.GotchaState
+import com.dartrack.model.KillerState
 import com.dartrack.model.X01State
 import com.dartrack.model.bot.BotLevel
+import com.dartrack.model.stateForMode
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
@@ -14,7 +18,7 @@ import kotlin.test.assertTrue
 import org.junit.Test
 
 /**
- * Worked examples for the tournament<->game glue ([defaultStateForMode],
+ * Worked examples for the tournament<->game glue ([stateForMode],
  * [buildMatchGameRecord], [reconcileMatch], [syncedWith]). Finished games are
  * built either by hand-setting [GameState.winnerIndices] (the seat the engine
  * would have reported) or by driving a real model to its natural finish, so the
@@ -56,13 +60,13 @@ class TournamentGameTest {
         return base.copy(state = base.state.withWinners(seats))
     }
 
-    // ---- defaultStateForMode: all 12 modes ----------------------------------
+    // ---- stateForMode with default options: every mode ----------------------
 
     @Test
-    fun defaultStateForMode_allModes_seatTwoAndNotFinished() {
+    fun stateForMode_allModes_seatTwoAndNotFinished() {
         val seats = listOf(GamePlayer(name = "A", id = "a"), GamePlayer(name = "B", id = "b"))
         for (mode in GameMode.values()) {
-            val state = defaultStateForMode(mode, seats)
+            val state = stateForMode(mode, seats)
             assertEquals(seats, state.players, "$mode: keeps the passed seats")
             assertEquals(2, state.players.size, "$mode: exactly two seats")
             assertFalse(state.isFinished, "$mode: a fresh state is not finished")
@@ -71,18 +75,56 @@ class TournamentGameTest {
     }
 
     @Test
-    fun defaultStateForMode_x01_is501DoubleOut() {
+    fun stateForMode_defaultOptions_x01Is501DoubleOutSingleLeg() {
         val seats = listOf(GamePlayer("A", "a"), GamePlayer("B", "b"))
-        val state = defaultStateForMode(GameMode.X01, seats) as X01State
+        val state = stateForMode(GameMode.X01, seats) as X01State
         assertEquals(501, state.startScore, "X01 default start is 501")
         assertTrue(state.doubleOut, "X01 default is double-out")
+        assertEquals(1, state.legsToWin, "X01 default is a single leg")
+        assertEquals(1, state.setsToWin, "X01 default has no sets")
     }
 
     @Test
-    fun defaultStateForMode_gotcha_isTarget301() {
+    fun stateForMode_defaultOptions_gotchaIsTarget301() {
         val seats = listOf(GamePlayer("A", "a"), GamePlayer("B", "b"))
-        val state = defaultStateForMode(GameMode.GOTCHA, seats) as GotchaState
+        val state = stateForMode(GameMode.GOTCHA, seats) as GotchaState
         assertEquals(301, state.target, "Gotcha default target is 301")
+    }
+
+    @Test
+    fun stateForMode_appliesEveryOption() {
+        val seats = listOf(GamePlayer("A", "a"), GamePlayer("B", "b"))
+        val options = GameOptions(
+            x01StartScore = 301,
+            x01DoubleOut = false,
+            x01LegsToWin = 3,
+            x01SetsToWin = 2,
+            cricketCutThroat = true,
+            gotchaTarget = 501,
+            killerLives = 5,
+        )
+        val x01 = stateForMode(GameMode.X01, seats, options) as X01State
+        assertEquals(301, x01.startScore)
+        assertFalse(x01.doubleOut)
+        assertEquals(3, x01.legsToWin)
+        assertEquals(2, x01.setsToWin)
+        assertTrue((stateForMode(GameMode.CRICKET, seats, options) as CricketState).cutThroat)
+        assertEquals(501, (stateForMode(GameMode.GOTCHA, seats, options) as GotchaState).target)
+        assertEquals(5, (stateForMode(GameMode.KILLER, seats, options) as KillerState).startLives)
+    }
+
+    @Test
+    fun buildMatchGameRecord_usesTournamentOptions() {
+        val options = GameOptions(x01StartScore = 701, x01DoubleOut = false, x01LegsToWin = 2)
+        val t = createTournament(
+            id = "t1", name = "Cup", competitors = listOf(human("Ann"), cpu("Bot")),
+            mode = GameMode.X01, options = options,
+        )
+        val rec = buildMatchGameRecord(t, t.matches.single(), gameId = "g-1", nowMs = 1L)
+        val state = rec.state as X01State
+        assertEquals(701, state.startScore, "match uses the tournament's start score")
+        assertFalse(state.doubleOut, "match uses the tournament's double-out setting")
+        assertEquals(2, state.legsToWin, "match uses the tournament's legs (first to 2)")
     }
 
     // ---- buildMatchGameRecord -----------------------------------------------

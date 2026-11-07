@@ -1,22 +1,6 @@
 package com.dartrack.data
 
-import com.dartrack.model.AroundTheClockState
-import com.dartrack.model.BaseballState
-import com.dartrack.model.BermudaState
-import com.dartrack.model.BobsTwentySevenState
-import com.dartrack.model.Catch40State
-import com.dartrack.model.CheckoutTrainerState
-import com.dartrack.model.CountUpState
-import com.dartrack.model.CricketState
-import com.dartrack.model.GameMode
-import com.dartrack.model.GamePlayer
-import com.dartrack.model.GameState
-import com.dartrack.model.GolfState
-import com.dartrack.model.GotchaState
-import com.dartrack.model.HalfItState
-import com.dartrack.model.KillerState
-import com.dartrack.model.ShanghaiState
-import com.dartrack.model.X01State
+import com.dartrack.model.stateForMode
 
 /**
  * Pure, Android-free glue between the round-robin tournament core (Tournament.kt)
@@ -26,47 +10,21 @@ import com.dartrack.model.X01State
  *
  * Everything here is pure (no clock, no filesystem, no RNG): the caller supplies
  * ids and timestamps, seats come from [TournamentCompetitor.toGamePlayer] (which
- * derives stable ids from competitor indices), and the default per-mode states
- * are the engines' own `.new(...)` factories. This keeps the seam unit-testable
- * and mirrors the comment density of GameRecord.kt / Tournament.kt.
+ * derives stable ids from competitor indices), and per-mode states come from
+ * the shared [stateForMode] with the tournament's [TournamentState.options].
+ * This keeps the seam unit-testable and mirrors the comment density of
+ * GameRecord.kt / Tournament.kt.
  */
-
-/**
- * The default starting [GameState] for a tournament match in [mode], seated with
- * [players] (a tournament match is always exactly the two competitors). Each mode
- * is created via its own `.new(...)` factory with sensible tournament defaults:
- *  - **X01** -> 501, double-out (the standard tournament leg);
- *  - **Cricket** -> standard scoring (not cut-throat);
- *  - **Gotcha** -> race to 301;
- *  - every other mode -> its plain `.new(players)` (no extra knobs to set).
- *
- * The `when` is exhaustive over all 14 [GameMode]s (no `else`) so adding a mode
- * is a compile error here until it is wired up. Pure.
- */
-fun defaultStateForMode(mode: GameMode, players: List<GamePlayer>): GameState = when (mode) {
-    GameMode.X01 -> X01State.new(players, startScore = 501, doubleOut = true)
-    GameMode.CRICKET -> CricketState.new(players, cutThroat = false)
-    GameMode.HALF_IT -> HalfItState.new(players)
-    GameMode.AROUND_CLOCK -> AroundTheClockState.new(players)
-    GameMode.BOBS_27 -> BobsTwentySevenState.new(players)
-    GameMode.SHANGHAI -> ShanghaiState.new(players)
-    GameMode.CATCH_40 -> Catch40State.new(players)
-    GameMode.COUNT_UP -> CountUpState.new(players)
-    GameMode.CHECKOUT_TRAINER -> CheckoutTrainerState.new(players)
-    GameMode.BASEBALL -> BaseballState.new(players)
-    GameMode.GOLF -> GolfState.new(players)
-    GameMode.GOTCHA -> GotchaState.new(players, target = 301)
-    GameMode.KILLER -> KillerState.new(players)
-    GameMode.BERMUDA -> BermudaState.new(players)
-}
 
 /**
  * Build the playable [GameRecord] for [match] within [state]. Seat 0 is the home
  * competitor (`state.competitors[match.homeIndex]`) and seat 1 is the away
  * competitor, each projected with [TournamentCompetitor.toGamePlayer] so humans
  * keep their registry id and CPUs get their stable `"bot:<index>"` seat. The
- * record carries the supplied [gameId] (so [reconcileMatch] can later link the
- * game back to this match) and the same [nowMs] for both created/updated stamps.
+ * game is configured from the tournament's [TournamentState.options] via the
+ * same [stateForMode] the New Game screen uses. The record carries the supplied
+ * [gameId] (so [reconcileMatch] can later link the game back to this match) and
+ * the same [nowMs] for both created/updated stamps.
  * Pure — no clock, no id generation.
  */
 fun buildMatchGameRecord(
@@ -82,7 +40,7 @@ fun buildMatchGameRecord(
         mode = state.mode,
         createdAtEpochMs = nowMs,
         updatedAtEpochMs = nowMs,
-        state = defaultStateForMode(state.mode, listOf(home, away)),
+        state = stateForMode(state.mode, listOf(home, away), state.options),
     )
 }
 

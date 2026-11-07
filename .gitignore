@@ -25,3 +25,4 @@ Thumbs.db
 # Keystores (debug.keystore is intentionally committed for stable signing)
 *.jks
 !app/debug.keystore
+.kotlin/

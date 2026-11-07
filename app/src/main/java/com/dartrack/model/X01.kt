@@ -341,8 +341,39 @@ data class X01State(
         }
 
         val SUPPORTED_STARTS = listOf(101, 201, 301, 401, 501, 701, 901)
-        val SUPPORTED_LEGS = listOf(1, 3, 5, 7)
-        val SUPPORTED_SETS = listOf(1, 3, 5)
+
+        /**
+         * "Best of N" choices offered at setup for both legs and sets (odd only,
+         * so a best-of always has a decider). Converted to the persisted
+         * first-to counts with [bestOfToFirstTo]; 1 = a single leg / no sets.
+         */
+        val BEST_OF_OPTIONS = (1..15 step 2).toList()
+    }
+}
+
+/**
+ * Convert a "best of [bestOf]" format to the "first to N" count the model
+ * persists ([X01State.legsToWin] / [X01State.setsToWin]): best of 5 -> first to
+ * 3. Values below 1 are treated as 1. Pure.
+ */
+fun bestOfToFirstTo(bestOf: Int): Int = (bestOf.coerceAtLeast(1) + 1) / 2
+
+/** Inverse of [bestOfToFirstTo]: first to 3 -> best of 5. Pure. */
+fun firstToToBestOf(firstTo: Int): Int = 2 * firstTo.coerceAtLeast(1) - 1
+
+/**
+ * Short user-facing description of an X01 match format, e.g. "Best of 5 legs"
+ * or "Best of 3 sets · best of 5 legs per set", from the persisted first-to
+ * counts. Null for a plain single leg (nothing worth showing). Pure.
+ */
+fun x01MatchFormatLabel(legsToWin: Int, setsToWin: Int): String? {
+    val legs = firstToToBestOf(legsToWin)
+    val sets = firstToToBestOf(setsToWin)
+    return when {
+        setsToWin > 1 -> "Best of $sets sets · " +
+            if (legs == 1) "1 leg per set" else "best of $legs legs per set"
+        legsToWin > 1 -> "Best of $legs legs"
+        else -> null
     }
 }
 

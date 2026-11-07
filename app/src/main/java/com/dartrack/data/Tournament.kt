@@ -1,6 +1,7 @@
 package com.dartrack.data
 
 import com.dartrack.model.GameMode
+import com.dartrack.model.GameOptions
 import com.dartrack.model.GamePlayer
 import com.dartrack.model.bot.BotLevel
 import kotlinx.serialization.Serializable
@@ -86,7 +87,11 @@ data class TournamentMatch(
  * created (indices into it are used everywhere); [matches] is the full fixture
  * list with results filled in by [recordResult]. [pointsForWin] / [pointsForDraw]
  * drive the [standings] points total (a loss is always worth 0). [createdAtEpochMs]
- * is supplied by the caller (the pure layer never reads the clock).
+ * is supplied by the caller (the pure layer never reads the clock). [options] are
+ * the per-mode settings every match is created with (see
+ * [buildMatchGameRecord]); its defaults are the fixed settings
+ * tournaments used before options existed, so older tournaments.json decodes
+ * unchanged.
  */
 @Serializable
 data class TournamentState(
@@ -98,6 +103,7 @@ data class TournamentState(
     val pointsForWin: Int = 3,
     val pointsForDraw: Int = 1,
     val createdAtEpochMs: Long = 0L,
+    val options: GameOptions = GameOptions(),
 )
 
 /**
@@ -165,7 +171,8 @@ private fun addPair(pairs: MutableList<Pair<Int, Int>>, a: Int, b: Int, bye: Int
  * Build a fresh [TournamentState] from [competitors] (at least two required),
  * scheduling every pairing once via [roundRobinSchedule]. Each fixture gets a
  * stable id "m-<round>-<i>-<j>" (round is 0-based; i < j are the competitor
- * indices), so ids are reproducible and independent of list order.
+ * indices), so ids are reproducible and independent of list order. Every match
+ * is later created with [options].
  */
 fun createTournament(
     id: String,
@@ -175,6 +182,7 @@ fun createTournament(
     pointsForWin: Int = 3,
     pointsForDraw: Int = 1,
     createdAtEpochMs: Long = 0L,
+    options: GameOptions = GameOptions(),
 ): TournamentState {
     require(competitors.size >= 2) {
         "a tournament needs at least 2 competitors, got ${competitors.size}"
@@ -202,6 +210,7 @@ fun createTournament(
         pointsForWin = pointsForWin,
         pointsForDraw = pointsForDraw,
         createdAtEpochMs = createdAtEpochMs,
+        options = options,
     )
 }
 

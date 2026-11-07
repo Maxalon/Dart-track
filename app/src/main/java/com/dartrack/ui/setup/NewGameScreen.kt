@@ -22,7 +22,6 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -43,24 +42,10 @@ import androidx.compose.ui.unit.sp
 import com.dartrack.data.GameRecord
 import com.dartrack.data.GameRepository
 import com.dartrack.data.PlayerRepository
-import com.dartrack.data.SettingsRepository
 import com.dartrack.model.GameMode
 import com.dartrack.model.GamePlayer
-import com.dartrack.model.AroundTheClockState
-import com.dartrack.model.BaseballState
-import com.dartrack.model.BermudaState
-import com.dartrack.model.BobsTwentySevenState
-import com.dartrack.model.Catch40State
-import com.dartrack.model.CountUpState
-import com.dartrack.model.CheckoutTrainerState
-import com.dartrack.model.CricketState
-import com.dartrack.model.GolfState
-import com.dartrack.model.GotchaState
-import com.dartrack.model.HalfItState
-import com.dartrack.model.KillerState
 import com.dartrack.model.Player
-import com.dartrack.model.ShanghaiState
-import com.dartrack.model.X01State
+import com.dartrack.model.stateForMode
 import com.dartrack.model.bot.BotLevel
 import kotlinx.coroutines.launch
 import java.util.UUID
@@ -86,38 +71,15 @@ fun NewGameScreen(
     val context = LocalContext.current
     val repo = remember { GameRepository.get(context) }
     val playerRepo = remember { PlayerRepository.get(context) }
-    val settingsRepo = remember { SettingsRepository.get(context) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) { playerRepo.load() }
-    LaunchedEffect(Unit) { settingsRepo.load() }
     val players by playerRepo.players.collectAsState()
-    val settings by settingsRepo.settings.collectAsState()
 
     var mode by remember { mutableStateOf(GameMode.X01) }
-    // Seed the X01 selectors from the user's saved defaults. The settings flow
-    // starts at in-memory defaults and is replaced once load() finishes, so we
-    // can't just read it into the initial remember (we'd miss the loaded value).
-    // Instead a one-shot LaunchedEffect applies the defaults exactly once after
-    // settings have loaded — before the user has had a chance to change the
-    // chips — and never fights subsequent user edits. defaultX01StartScore is
-    // guaranteed valid by Settings.sanitized(), but we filter defensively.
-    var startScore by remember { mutableStateOf(501) }
-    var doubleOut by remember { mutableStateOf(true) }
-    var defaultsApplied by remember { mutableStateOf(false) }
-    LaunchedEffect(settings) {
-        if (!defaultsApplied) {
-            if (settings.defaultX01StartScore in X01State.SUPPORTED_STARTS) {
-                startScore = settings.defaultX01StartScore
-            }
-            doubleOut = settings.defaultDoubleOut
-            defaultsApplied = true
-        }
-    }
-    var legsToWin by remember { mutableStateOf(1) }
-    var setsToWin by remember { mutableStateOf(1) }
-    var cutThroat by remember { mutableStateOf(false) }
-    var killerLives by remember { mutableStateOf(3) }
+    // Per-mode options (X01 seeded from the user's saved defaults); the same
+    // editor + options->state mapping is used by NewTournamentScreen.
+    var options by rememberSeededGameOptions()
     // One choice per seat; start with two empty human seats.
     val seats = remember {
         mutableStateListOf<SeatChoice>(SeatChoice.Human(null), SeatChoice.Human(null))
@@ -176,85 +138,7 @@ fun NewGameScreen(
             }
         }
 
-        if (mode == GameMode.X01) {
-            Spacer(Modifier.height(16.dp))
-            Text("Start score", fontWeight = FontWeight.SemiBold)
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                X01State.SUPPORTED_STARTS.forEach { s ->
-                    FilterChip(
-                        selected = startScore == s,
-                        onClick = { startScore = s },
-                        label = { Text(s.toString()) },
-                    )
-                }
-            }
-            Spacer(Modifier.height(8.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Switch(checked = doubleOut, onCheckedChange = { doubleOut = it })
-                Spacer(Modifier.height(0.dp))
-                Text("  Finish on a double (double-out)")
-            }
-            Spacer(Modifier.height(16.dp))
-            Text(
-                if (setsToWin > 1) "Legs per set (first to)" else "Legs (first to)",
-                fontWeight = FontWeight.SemiBold,
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                X01State.SUPPORTED_LEGS.forEach { n ->
-                    FilterChip(
-                        selected = legsToWin == n,
-                        onClick = { legsToWin = n },
-                        label = { Text(if (n == 1) "Single leg" else "First to $n") },
-                    )
-                }
-            }
-            Spacer(Modifier.height(16.dp))
-            Text("Sets (first to)", fontWeight = FontWeight.SemiBold)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                X01State.SUPPORTED_SETS.forEach { n ->
-                    FilterChip(
-                        selected = setsToWin == n,
-                        onClick = { setsToWin = n },
-                        label = { Text(if (n == 1) "No sets" else "First to $n") },
-                    )
-                }
-            }
-        }
-
-        if (mode == GameMode.CRICKET) {
-            Spacer(Modifier.height(16.dp))
-            Text("Variant", fontWeight = FontWeight.SemiBold)
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                FilterChip(
-                    selected = cutThroat,
-                    onClick = { cutThroat = !cutThroat },
-                    label = { Text("Cut-throat") },
-                )
-            }
-        }
-
-        if (mode == GameMode.KILLER) {
-            Spacer(Modifier.height(16.dp))
-            Text("Lives", fontWeight = FontWeight.SemiBold)
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                listOf(3, 5).forEach { n ->
-                    FilterChip(
-                        selected = killerLives == n,
-                        onClick = { killerLives = n },
-                        label = { Text(n.toString()) },
-                    )
-                }
-            }
-        }
+        GameOptionsEditor(mode = mode, options = options, onChange = { options = it })
 
         Spacer(Modifier.height(16.dp))
         Text("Players (${seats.size})", fontWeight = FontWeight.SemiBold)
@@ -355,22 +239,7 @@ fun NewGameScreen(
                             )
                         }
                     }
-                    val state = when (mode) {
-                        GameMode.X01 -> X01State.new(gamePlayers, startScore, doubleOut, legsToWin, setsToWin)
-                        GameMode.CRICKET -> CricketState.new(gamePlayers, cutThroat)
-                        GameMode.HALF_IT -> HalfItState.new(gamePlayers)
-                        GameMode.AROUND_CLOCK -> AroundTheClockState.new(gamePlayers)
-                        GameMode.BOBS_27 -> BobsTwentySevenState.new(gamePlayers)
-                        GameMode.SHANGHAI -> ShanghaiState.new(gamePlayers)
-                        GameMode.CATCH_40 -> Catch40State.new(gamePlayers)
-                        GameMode.COUNT_UP -> CountUpState.new(gamePlayers)
-                        GameMode.CHECKOUT_TRAINER -> CheckoutTrainerState.new(gamePlayers)
-                        GameMode.BASEBALL -> BaseballState.new(gamePlayers)
-                        GameMode.GOLF -> GolfState.new(gamePlayers)
-                        GameMode.GOTCHA -> GotchaState.new(gamePlayers)
-                        GameMode.KILLER -> KillerState.new(gamePlayers, killerLives)
-                        GameMode.BERMUDA -> BermudaState.new(gamePlayers)
-                    }
+                    val state = stateForMode(mode, gamePlayers, options)
                     val now = System.currentTimeMillis()
                     val record = GameRecord(
                         id = UUID.randomUUID().toString(),

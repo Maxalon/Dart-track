@@ -1,6 +1,7 @@
 package com.dartrack.data
 
 import com.dartrack.model.GameMode
+import com.dartrack.model.GameOptions
 import com.dartrack.model.bot.BotLevel
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -377,6 +378,41 @@ class TournamentTest {
         val playedMatch = back.matches.single { it.played }
         assertEquals(0, playedMatch.winnerIndex, "recorded winner preserved")
         assertEquals("g-1", playedMatch.gameId, "recorded game id preserved")
+    }
+
+    @Test
+    fun jsonRoundTrip_preservesOptions() {
+        val options = GameOptions(x01StartScore = 301, x01LegsToWin = 3, x01SetsToWin = 2)
+        val t = createTournament(
+            "t-opt", "Options", listOf(human("Alice"), human("Bob")), GameMode.X01,
+            options = options,
+        )
+        val back = decodeTournamentStore(encodeTournamentStore(listOf(t))).single()
+        assertEquals(options, back.options, "match options survive the round-trip")
+    }
+
+    @Test
+    fun decode_legacyTournamentWithoutOptions_getsOldFixedDefaults() {
+        // A tournaments.json written before per-tournament options existed: no
+        // "options" key at all. It must still decode, with the settings matches
+        // were always created with (501 double-out single leg, Gotcha 301, …).
+        val legacy = """
+            {"schemaVersion":${TournamentStore.SCHEMA_VERSION},"tournaments":[
+              {"id":"t-old","name":"Old cup","mode":"X01",
+               "competitors":[{"name":"Alice","playerId":"alice"},{"name":"Bob","playerId":"bob"}],
+               "matches":[{"id":"m-0-0-1","round":0,"homeIndex":0,"awayIndex":1}]}
+            ]}
+        """.trimIndent()
+        val t = decodeTournamentStore(legacy).single()
+        assertEquals("t-old", t.id)
+        assertEquals(GameOptions(), t.options, "missing options decode to the defaults")
+        assertEquals(501, t.options.x01StartScore)
+        assertTrue(t.options.x01DoubleOut)
+        assertEquals(1, t.options.x01LegsToWin)
+        assertEquals(1, t.options.x01SetsToWin)
+        assertFalse(t.options.cricketCutThroat)
+        assertEquals(301, t.options.gotchaTarget)
+        assertEquals(3, t.options.killerLives)
     }
 
     @Test

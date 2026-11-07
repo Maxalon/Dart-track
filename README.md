@@ -17,9 +17,10 @@ Gotcha and Killer are the competitive games; the rest form a **practice suite**.
   double-out. You enter a single 0-180 three-dart total per turn (numpad with
   confirm); individual darts aren't tracked. Bust detection, finish-on-double
   prompt, and **live checkout suggestions** when the remaining score is
-  finishable. **Match play**: play a single leg, first-to-N legs (1/3/5/7), and
-  optionally first-to-N sets (1/3/5). The throw order rotates each leg, a
-  scoreboard shows legs/sets won, and Undo works across leg and set boundaries.
+  finishable. **Match play**: pick legs and sets side by side as **best of**
+  1, 3, 5 … 15 (best of 1 = a single leg / no sets; best of 5 is won by the
+  first to 3). The throw order rotates each leg, a scoreboard shows legs/sets
+  won, and Undo works across leg and set boundaries.
   Stats aggregate over every leg of a match. A seat can be a **CPU opponent**
   (see below).
 - **Cricket** — standard scoring on 20, 19, 18, 17, 16, 15 and bull. Per-target
@@ -89,6 +90,16 @@ Gotcha and Killer are the competitive games; the rest form a **practice suite**.
   golf where **lower is better**. You throw up to 3 darts at the number and
   record your **best** dart: triple = 1 stroke, double = 2, single = 3, a miss =
   5. Lowest total strokes after 9 holes wins.
+
+### Tournaments
+
+Run a **round-robin tournament** of registered players and/or CPUs: everyone
+plays everyone once (one competitor sits out each round when the field is odd)
+and a standings table ranks by points (win 3, draw 1), then wins, head-to-head
+and fewer losses. Setup offers the **same per-mode options as New Game** (X01
+start score, double-out and best-of legs/sets, Cricket cut-throat, Gotcha target,
+Killer lives); they are stored with the tournament and every match is created
+with them.
 
 ### CPU opponent
 
@@ -199,12 +210,13 @@ by the screen that consumes it, so what you set here takes effect.
     default (the caller itself still starts whatever this default says, and can
     be toggled per game).
   - **X01 defaults** — the start score and double-out used to seed the New Game
-    screen, which reads them when you set up an X01 game.
+    and New Tournament screens when you set up an X01 game or tournament.
 
 ## Local data
 
 - All games (in-progress and finished) are saved to `<app-files>/games.json`,
-  and the player registry to `players.json`, via `kotlinx.serialization`.
+  the player registry to `players.json`, and tournaments (with their match
+  options) to `tournaments.json`, via `kotlinx.serialization`.
 - The **history** screen lists every game, lets you resume in-progress games,
   view details, or delete them.
 - **Export / import** — the history screen can export all games as a JSON file

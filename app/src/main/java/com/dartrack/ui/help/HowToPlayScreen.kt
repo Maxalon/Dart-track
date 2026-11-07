@@ -66,8 +66,8 @@ fun HowToPlayScreen(onBack: () -> Unit) {
                     "single 0–180 three-dart total each turn; going below zero busts " +
                     "and scores nothing. With double-out on you must finish on a double, " +
                     "and a live checkout suggestion appears once the score is finishable. " +
-                    "Play a single leg or a match — first to N legs, optionally first " +
-                    "to N sets — and a seat can be a CPU opponent.",
+                    "Play a single leg or a match — best of N legs, optionally best " +
+                    "of N sets — and a seat can be a CPU opponent.",
             )
             ModeCard(
                 "Cricket",
