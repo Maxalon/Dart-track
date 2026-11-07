@@ -41,6 +41,7 @@ import com.dartrack.data.GameRepository
 import com.dartrack.model.Checkout
 import com.dartrack.model.X01State
 import com.dartrack.model.X01Stats
+import com.dartrack.model.x01MatchFormatLabel
 import com.dartrack.viewmodel.GameViewModel
 
 @Composable
@@ -108,12 +109,7 @@ fun X01GameScreen(
         ) {
             Text(
                 "X01 · start ${state.startScore}${if (state.doubleOut) " · DO" else ""}" +
-                    when {
-                        state.setsToWin > 1 ->
-                            " · first to ${state.setsToWin} sets · ${state.legsToWin} legs/set"
-                        state.legsToWin > 1 -> " · first to ${state.legsToWin} legs"
-                        else -> ""
-                    },
+                    (x01MatchFormatLabel(state.legsToWin, state.setsToWin)?.let { " · $it" } ?: ""),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.weight(1f),

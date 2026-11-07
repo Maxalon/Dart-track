@@ -53,6 +53,7 @@ import com.dartrack.model.SHANGHAI_ROUNDS
 import com.dartrack.model.ShanghaiState
 import com.dartrack.model.X01State
 import com.dartrack.model.X01Stats
+import com.dartrack.model.x01MatchFormatLabel
 import kotlinx.coroutines.launch
 import java.text.DateFormat
 import java.util.Date
@@ -176,7 +177,7 @@ private fun X01Detail(s: X01State) {
         Column(modifier = Modifier.padding(12.dp)) {
             Text(
                 "Start ${s.startScore}${if (s.doubleOut) " · double-out" else ""}" +
-                    if (s.isMatch) " · first to ${s.legsToWin} legs" else "",
+                    (x01MatchFormatLabel(s.legsToWin, s.setsToWin)?.let { " · $it" } ?: ""),
                 fontWeight = FontWeight.SemiBold,
             )
             if (s.isMatch) {

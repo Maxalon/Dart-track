@@ -49,15 +49,18 @@ import com.dartrack.data.fillWithCpus
 import com.dartrack.model.GameMode
 import com.dartrack.model.Player
 import com.dartrack.model.bot.BotLevel
+import com.dartrack.ui.setup.GameOptionsEditor
+import com.dartrack.ui.setup.rememberSeededGameOptions
 import kotlinx.coroutines.launch
 import java.util.UUID
 
 /**
  * Setup screen for a new round-robin tournament: a name field, a competitor
  * builder (add registered players and/or CPUs, remove any), a "fill to N with
- * CPUs" convenience, and a mode picker over all 12 [GameMode]s. "Create" builds
- * the [com.dartrack.data.TournamentState] via [createTournament], persists it, and
- * navigates to it.
+ * CPUs" convenience, a mode picker over every [GameMode] plus that mode's
+ * options (the shared [GameOptionsEditor], so matches can be configured exactly
+ * like a New Game). "Create" builds the [com.dartrack.data.TournamentState] via
+ * [createTournament], persists it, and navigates to it.
  *
  * Mirrors NewGameScreen's conventions: the same registered-[Player] picker
  * (anchored [ExposedDropdownMenuBox] over [PlayerRepository]), the same
@@ -80,6 +83,9 @@ fun NewTournamentScreen(
 
     var name by remember { mutableStateOf("") }
     var mode by remember { mutableStateOf(GameMode.X01) }
+    // Per-mode match settings, edited with the same block as New Game; stored on
+    // the tournament so every match is created with them.
+    var options by rememberSeededGameOptions()
     // The competitors built so far, in pick order. CPUs cycle through BotLevel as
     // they are added so a quick "Add CPU" gives a believable mixed field.
     val competitors = remember { mutableStateListOf<TournamentCompetitor>() }
@@ -123,6 +129,7 @@ fun NewTournamentScreen(
                 )
             }
         }
+        GameOptionsEditor(mode = mode, options = options, onChange = { options = it })
 
         Spacer(Modifier.height(16.dp))
         Text("Competitors (${competitors.size})", fontWeight = FontWeight.SemiBold)
@@ -244,6 +251,7 @@ fun NewTournamentScreen(
                         competitors = competitors.toList(),
                         mode = mode,
                         createdAtEpochMs = System.currentTimeMillis(),
+                        options = options,
                     )
                     scope.launch {
                         tournamentRepo.upsert(t)

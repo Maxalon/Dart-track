@@ -581,4 +581,54 @@ class X01StateTest {
         assertEquals(180, X01Stats.pointsScored(legs, 180))
         assertEquals(180, X01Stats.highestTurn(legs))
     }
+
+    // ---------------------------------------------------------- best-of helpers
+
+    @Test
+    fun bestOfOptions_areOdd1To15() {
+        assertEquals(listOf(1, 3, 5, 7, 9, 11, 13, 15), X01State.BEST_OF_OPTIONS)
+    }
+
+    @Test
+    fun bestOfToFirstTo_convertsAndRoundTrips() {
+        assertEquals(1, bestOfToFirstTo(1))
+        assertEquals(2, bestOfToFirstTo(3))
+        assertEquals(3, bestOfToFirstTo(5))
+        assertEquals(8, bestOfToFirstTo(15))
+        assertEquals(1, bestOfToFirstTo(0), "below 1 is treated as 1")
+        assertEquals(1, firstToToBestOf(1))
+        assertEquals(5, firstToToBestOf(3))
+        for (n in X01State.BEST_OF_OPTIONS) {
+            assertEquals(n, firstToToBestOf(bestOfToFirstTo(n)), "best of $n round-trips")
+        }
+    }
+
+    @Test
+    fun bestOfFive_isWonOnThirdLeg() {
+        var s = match(start = 40, doubleOut = false, legsToWin = bestOfToFirstTo(5), "A", "B")
+        fun aLeg(st: X01State): X01State {
+            var x = st
+            if (x.currentPlayerIndex != 0) x = x.applyTurn(0)
+            return x.applyTurn(40)
+        }
+        s = aLeg(s); s = aLeg(s)
+        assertFalse(s.isFinished, "2 legs of a best of 5 is not enough")
+        s = aLeg(s)
+        assertTrue(s.isFinished, "3rd leg wins a best of 5")
+        assertEquals(listOf(0), s.winnerIndices)
+    }
+
+    @Test
+    fun matchFormatLabel_describesBestOf() {
+        assertEquals(null, x01MatchFormatLabel(legsToWin = 1, setsToWin = 1))
+        assertEquals("Best of 5 legs", x01MatchFormatLabel(legsToWin = 3, setsToWin = 1))
+        assertEquals(
+            "Best of 3 sets · best of 5 legs per set",
+            x01MatchFormatLabel(legsToWin = 3, setsToWin = 2),
+        )
+        assertEquals(
+            "Best of 5 sets · 1 leg per set",
+            x01MatchFormatLabel(legsToWin = 1, setsToWin = 3),
+        )
+    }
 }
