@@ -149,4 +149,91 @@ class ApiClientTest {
         assertEquals("/v1/me/password", req.path)
         assertEquals("""{"currentPassword":"old","newPassword":"newpass"}""", req.body.readUtf8())
     }
+
+    // ---- Friends ------------------------------------------------------------
+
+    @Test
+    fun friends_parsesAllThreeLists() = runBlocking<Unit> {
+        server.enqueue(
+            json(
+                200,
+                """{"friends":[{"id":"u1","username":"Anna","since":10}],
+                   "incoming":[{"id":"u2","username":"Ben","createdAt":20}],
+                   "outgoing":[]}""",
+            ),
+        )
+        val ok = assertIs<ApiResult.Ok<FriendsList>>(client.friends("t"))
+        assertEquals(listOf(FriendEntry("u1", "Anna", 10)), ok.value.friends)
+        assertEquals(listOf(FriendRequestEntry("u2", "Ben", 20)), ok.value.incoming)
+        assertTrue(ok.value.outgoing.isEmpty())
+        val req = server.takeRequest()
+        assertEquals("GET", req.method)
+        assertEquals("/v1/friends", req.path)
+        assertEquals("Bearer t", req.getHeader("Authorization"))
+    }
+
+    @Test
+    fun sendFriendRequest_requestedAndAlreadyAsked() = runBlocking<Unit> {
+        server.enqueue(json(201, """{"status":"requested","user":{"id":"u3","username":"Cleo"}}"""))
+        server.enqueue(json(200, """{"status":"friends","user":{"id":"u2","username":"Ben"},"since":5}"""))
+
+        val first = assertIs<ApiResult.Ok<FriendRequestResult>>(client.sendFriendRequest("t", "cleo"))
+        assertFalse(first.value.becameFriends)
+        val req = server.takeRequest()
+        assertEquals("POST", req.method)
+        assertEquals("/v1/friends/requests", req.path)
+        assertEquals("""{"username":"cleo"}""", req.body.readUtf8())
+
+        val second = assertIs<ApiResult.Ok<FriendRequestResult>>(client.sendFriendRequest("t", "ben"))
+        assertTrue(second.value.becameFriends)
+        assertEquals("Ben", second.value.user.username)
+    }
+
+    @Test
+    fun sendFriendRequest_errors() = runBlocking<Unit> {
+        server.enqueue(json(404, """{"error":"user_not_found","message":"x"}"""))
+        server.enqueue(json(409, """{"error":"already_requested","message":"x"}"""))
+        server.enqueue(json(400, """{"error":"cannot_friend_self","message":"x"}"""))
+        assertEquals("user_not_found", assertIs<ApiResult.HttpError>(client.sendFriendRequest("t", "x")).code)
+        val conflict = assertIs<ApiResult.HttpError>(client.sendFriendRequest("t", "y"))
+        assertEquals(409, conflict.status)
+        assertEquals("already_requested", conflict.code)
+        assertEquals("You can't add yourself.", assertIs<ApiResult.HttpError>(client.sendFriendRequest("t", "me")).userMessage())
+    }
+
+    @Test
+    fun acceptDeclineRemove_hitTheRightPaths() = runBlocking<Unit> {
+        server.enqueue(json(200, """{"status":"friends","user":{"id":"u2","username":"Ben"},"since":5}"""))
+        server.enqueue(MockResponse().setResponseCode(204))
+        server.enqueue(MockResponse().setResponseCode(204))
+
+        assertIs<ApiResult.Ok<FriendRequestResult>>(client.acceptFriendRequest("t", "u2"))
+        val accept = server.takeRequest()
+        assertEquals("POST", accept.method)
+        assertEquals("/v1/friends/requests/u2/accept", accept.path)
+        assertEquals(0L, accept.bodySize)
+
+        assertIs<ApiResult.Ok<Unit>>(client.deleteFriendRequest("t", "u3"))
+        val decline = server.takeRequest()
+        assertEquals("DELETE", decline.method)
+        assertEquals("/v1/friends/requests/u3", decline.path)
+
+        assertIs<ApiResult.Ok<Unit>>(client.removeFriend("t", "u1"))
+        val remove = server.takeRequest()
+        assertEquals("DELETE", remove.method)
+        assertEquals("/v1/friends/u1", remove.path)
+    }
+
+    @Test
+    fun idsAreEncodedAsASingleSegment() = runBlocking<Unit> {
+        server.enqueue(MockResponse().setResponseCode(204))
+        client.removeFriend("t", "a/b")
+        assertEquals("/v1/friends/a%2Fb", server.takeRequest().path)
+    }
+
+    @Test
+    fun friends_unauthorized() = runBlocking<Unit> {
+        server.enqueue(json(401, """{"error":"unauthorized","message":"x"}"""))
+        assertTrue(client.friends("dead").isUnauthorized)
+    }
 }

@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -40,6 +42,9 @@ fun HomeScreen(
     onManagePlayers: () -> Unit,
     onSettings: () -> Unit,
     onHowToPlay: () -> Unit,
+    onFriends: () -> Unit,
+    /** Pending incoming friend requests, shown as a badge (0 = none / logged out). */
+    friendRequestCount: Int = 0,
 ) {
     Box(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
         // Settings gear pinned to the top-end corner, above the centered menu.
@@ -107,6 +112,16 @@ fun HomeScreen(
             Spacer(Modifier.height(12.dp))
             OutlinedButton(onClick = onManagePlayers, modifier = Modifier.fillMaxWidth()) {
                 Text("Manage players")
+            }
+            Spacer(Modifier.height(12.dp))
+            OutlinedButton(onClick = onFriends, modifier = Modifier.fillMaxWidth()) {
+                BadgedBox(
+                    badge = {
+                        if (friendRequestCount > 0) Badge { Text(friendRequestCount.toString()) }
+                    },
+                ) {
+                    Text("Friends")
+                }
             }
             Spacer(Modifier.height(12.dp))
             OutlinedButton(onClick = onHowToPlay, modifier = Modifier.fillMaxWidth()) {

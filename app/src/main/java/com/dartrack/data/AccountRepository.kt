@@ -45,7 +45,8 @@ data class Account(
  */
 class AccountRepository private constructor(
     private val file: File,
-    private val api: ApiClient,
+    /** Shared server client (FriendsRepository calls through [authed] with it). */
+    val api: ApiClient,
     private val players: PlayerRepository,
 ) {
 

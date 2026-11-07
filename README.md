@@ -233,6 +233,22 @@ the Dart-Track server at `https://darts.kontrollzentrale.de`.
 - The login token is stored in app-private storage that is excluded from
   backups (`no_backup/account.json`).
 
+### Friends
+
+Logged in, **Friends** (on Home, and in Settings → Account) lets you add people
+by their exact username (case doesn't matter). They accept or decline; either
+side can remove the friendship later. The screen has sections for incoming
+**Requests**, your **Friends** and **Sent** requests, refreshes when opened
+(and on pull-down), and Home shows a badge with the number of pending requests.
+The list is fetched on app start and cached (`friends.json`), so it still works
+offline.
+
+Accepted friends appear in the New Game and New Tournament player pickers,
+tagged "friend". Picking one uses a local player linked to that friend (created
+the first time, named after their username), so the game records them like any
+other seat. When you're logged in, your own player fills the first seat by
+default.
+
 ## Local data
 
 - All games (in-progress and finished) are saved to `<app-files>/games.json`,

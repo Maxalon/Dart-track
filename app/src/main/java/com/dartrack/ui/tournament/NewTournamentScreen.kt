@@ -41,7 +41,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.dartrack.data.AccountRepository
+import com.dartrack.data.FriendsRepository
+import com.dartrack.data.PlayerOption
 import com.dartrack.data.PlayerRepository
+import com.dartrack.data.friendsFor
+import com.dartrack.data.playerOptions
 import com.dartrack.data.TournamentCompetitor
 import com.dartrack.data.TournamentRepository
 import com.dartrack.data.createTournament
@@ -49,6 +54,7 @@ import com.dartrack.data.fillWithCpus
 import com.dartrack.model.GameMode
 import com.dartrack.model.Player
 import com.dartrack.model.bot.BotLevel
+import com.dartrack.ui.setup.FriendLabel
 import com.dartrack.ui.setup.GameOptionsEditor
 import com.dartrack.ui.setup.rememberSeededGameOptions
 import kotlinx.coroutines.launch
@@ -78,8 +84,15 @@ fun NewTournamentScreen(
     val tournamentRepo = remember { TournamentRepository.get(context) }
     val scope = rememberCoroutineScope()
 
+    val accountRepo = remember { AccountRepository.get(context) }
+    val friendsRepo = remember { FriendsRepository.get(context) }
+
     LaunchedEffect(Unit) { playerRepo.load() }
     val players by playerRepo.players.collectAsState()
+    val account by accountRepo.account.collectAsState()
+    val friendsCache by friendsRepo.cache.collectAsState()
+    // Local players plus (when logged in) accepted friends, as in New Game.
+    val pickOptions = playerOptions(players, friendsFor(friendsCache, account).friends, account?.mePlayerId)
 
     var name by remember { mutableStateOf("") }
     var mode by remember { mutableStateOf(GameMode.X01) }
@@ -156,10 +169,16 @@ fun NewTournamentScreen(
         Spacer(Modifier.height(8.dp))
         // Add a registered player via the same picker idiom as NewGameScreen.
         CompetitorPicker(
-            allPlayers = players,
+            options = pickOptions,
             takenIds = takenIds,
-            onSelect = { p ->
-                competitors.add(TournamentCompetitor(name = p.name, playerId = p.id))
+            onSelect = { option ->
+                scope.launch {
+                    // A friend without a local player yet gets one created on the fly.
+                    val p = option.player ?: friendsRepo.playerFor(option.friend!!)
+                    if (competitors.none { it.playerId == p.id }) {
+                        competitors.add(TournamentCompetitor(name = p.name, playerId = p.id))
+                    }
+                }
             },
             onCreate = { query ->
                 scope.launch {
@@ -277,7 +296,8 @@ fun NewTournamentScreen(
 }
 
 /**
- * An [OutlinedTextField] whose typed text filters registered players in an
+ * An [OutlinedTextField] whose typed text filters registered players (and,
+ * when logged in, friends — tagged "friend") in an
  * anchored [ExposedDropdownMenuBox]; choosing one calls [onSelect] (and clears
  * the field so the next pick starts fresh), and a "Create" item at the bottom
  * adds a brand-new player. Mirrors NewGameScreen's SeatPicker, adapted to APPEND
@@ -286,20 +306,20 @@ fun NewTournamentScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CompetitorPicker(
-    allPlayers: List<Player>,
+    options: List<PlayerOption>,
     takenIds: Set<String>,
-    onSelect: (Player) -> Unit,
+    onSelect: (PlayerOption) -> Unit,
     onCreate: (String) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
 
     val trimmed = query.trim()
-    val matches = allPlayers.filter { p ->
-        p.id !in takenIds &&
-            (trimmed.isEmpty() || p.name.contains(trimmed, ignoreCase = true))
+    val matches = options.filter { o ->
+        o.player?.id !in takenIds &&
+            (trimmed.isEmpty() || o.name.contains(trimmed, ignoreCase = true))
     }
-    val exactExists = allPlayers.any { it.name.equals(trimmed, ignoreCase = true) }
+    val exactExists = options.any { it.name.equals(trimmed, ignoreCase = true) }
     val canCreate = trimmed.isNotEmpty() && !exactExists
 
     ExposedDropdownMenuBox(
@@ -324,11 +344,12 @@ private fun CompetitorPicker(
             expanded = expanded,
             onDismissRequest = { expanded = false },
         ) {
-            matches.forEach { p ->
+            matches.forEach { o ->
                 DropdownMenuItem(
-                    text = { Text(p.name) },
+                    text = { Text(o.name) },
+                    trailingIcon = if (o.isFriend) ({ FriendLabel() }) else null,
                     onClick = {
-                        onSelect(p)
+                        onSelect(o)
                         query = ""
                         expanded = false
                     },

@@ -27,7 +27,9 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.dartrack.data.AccountRepository
+import com.dartrack.data.FriendsRepository
 import com.dartrack.data.GameRepository
+import com.dartrack.data.friendsFor
 import com.dartrack.data.PlayerRepository
 import com.dartrack.data.SettingsRepository
 import com.dartrack.data.achievementSummary
@@ -36,6 +38,7 @@ import com.dartrack.ui.account.AccountScreen
 import com.dartrack.ui.account.AccountSection
 import com.dartrack.ui.account.MePlayerDialog
 import com.dartrack.ui.achievements.AchievementsScreen
+import com.dartrack.ui.friends.FriendsScreen
 import com.dartrack.ui.game.AroundTheClockScreen
 import com.dartrack.ui.game.BaseballScreen
 import com.dartrack.ui.game.BermudaScreen
@@ -90,10 +93,17 @@ fun AppRoot() {
     val registry = remember { PlayerRepository.get(context) }
     val account by accountRepo.account.collectAsState()
     val accountNotice by accountRepo.notice.collectAsState()
+    val friendsRepo = remember { FriendsRepository.get(context) }
+    val friendsCache by friendsRepo.cache.collectAsState()
     LaunchedEffect(Unit) {
         registry.load()
+        friendsRepo.load()
         accountRepo.load()
         if (accountRepo.account.value != null) accountRepo.refreshMe()
+    }
+    // Friends (and the Home badge count) refresh on app start and after a login.
+    LaunchedEffect(account?.userId) {
+        if (account != null) friendsRepo.refresh()
     }
     // "Which player is you?" right after a login that found no linked player.
     // "Later" hides it for this login; Settings → Account can still choose.
@@ -147,6 +157,8 @@ fun AppRoot() {
                     onManagePlayers = { nav.navigate("players") },
                     onSettings = { nav.navigate("settings") },
                     onHowToPlay = { nav.navigate("how_to_play") },
+                    onFriends = { nav.navigate("friends") },
+                    friendRequestCount = friendsFor(friendsCache, account).incoming.size,
                 )
             }
             composable(
@@ -322,13 +334,24 @@ fun AppRoot() {
                     settings = settings,
                     onChange = { next -> settingsVm.update { next } },
                     onBack = { nav.popBackStack() },
-                    accountSection = { AccountSection(onLogIn = { nav.navigate("account") }) },
+                    accountSection = {
+                        AccountSection(
+                            onLogIn = { nav.navigate("account") },
+                            onFriends = { nav.navigate("friends") },
+                        )
+                    },
                 )
             }
             composable("account") {
                 AccountScreen(
                     onBack = { nav.popBackStack() },
                     onDone = { nav.popBackStack() },
+                )
+            }
+            composable("friends") {
+                FriendsScreen(
+                    onBack = { nav.popBackStack() },
+                    onLogIn = { nav.navigate("account") },
                 )
             }
         }

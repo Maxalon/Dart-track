@@ -48,6 +48,31 @@ data class AuthResponse(val token: String, val user: ApiUser)
 @Serializable
 data class MeResponse(val id: String, val username: String, val statsHidden: Boolean = false)
 
+/** An accepted friend; [since] is epoch ms. */
+@Serializable
+data class FriendEntry(val id: String, val username: String, val since: Long = 0)
+
+/** A pending friend request (incoming or outgoing); [createdAt] is epoch ms. */
+@Serializable
+data class FriendRequestEntry(val id: String, val username: String, val createdAt: Long = 0)
+
+/** `GET /v1/friends`. */
+@Serializable
+data class FriendsList(
+    val friends: List<FriendEntry> = emptyList(),
+    val incoming: List<FriendRequestEntry> = emptyList(),
+    val outgoing: List<FriendRequestEntry> = emptyList(),
+)
+
+/** Answer to sending/accepting a request: [status] is `requested` or `friends`. */
+@Serializable
+data class FriendRequestResult(val status: String, val user: ApiUser) {
+    val becameFriends: Boolean get() = status == "friends"
+}
+
+@Serializable
+private data class FriendRequestBody(val username: String)
+
 @Serializable
 private data class SignupBody(val username: String, val password: String, val deviceName: String?)
 
@@ -118,26 +143,58 @@ class ApiClient(
             ),
         )
 
+    // ---- Friends ------------------------------------------------------------
+
+    suspend fun friends(token: String): ApiResult<FriendsList> =
+        call(get("v1/friends", token), FriendsList.serializer())
+
+    /** Request friendship by exact username (case-insensitive on the server). */
+    suspend fun sendFriendRequest(token: String, username: String): ApiResult<FriendRequestResult> =
+        call(
+            post("v1/friends/requests", json.encodeToString(FriendRequestBody.serializer(), FriendRequestBody(username)), token),
+            FriendRequestResult.serializer(),
+        )
+
+    suspend fun acceptFriendRequest(token: String, userId: String): ApiResult<FriendRequestResult> =
+        call(post("v1/friends/requests/{}/accept", null, token, userId), FriendRequestResult.serializer())
+
+    /** Declines their request, or cancels yours — the server treats both the same. */
+    suspend fun deleteFriendRequest(token: String, userId: String): ApiResult<Unit> =
+        callUnit(delete("v1/friends/requests/{}", token, userId))
+
+    suspend fun removeFriend(token: String, userId: String): ApiResult<Unit> =
+        callUnit(delete("v1/friends/{}", token, userId))
+
     // ---- Request plumbing ---------------------------------------------------
 
-    private fun url(path: String): HttpUrl =
-        base.newBuilder().addPathSegments(path).build()
+    /**
+     * [path] relative to the base URL; each `{}` segment is filled, in order,
+     * from [ids] as one percent-encoded segment (so an id can't add segments).
+     */
+    private fun url(path: String, ids: Array<out String>): HttpUrl {
+        val next = ids.iterator()
+        val builder = base.newBuilder()
+        path.split('/').forEach { builder.addPathSegment(if (it == "{}") next.next() else it) }
+        return builder.build()
+    }
 
-    private fun builder(path: String, token: String?): Request.Builder =
-        Request.Builder().url(url(path)).apply {
+    private fun builder(path: String, token: String?, ids: Array<out String>): Request.Builder =
+        Request.Builder().url(url(path, ids)).apply {
             if (token != null) header("Authorization", "Bearer $token")
         }
 
-    internal fun get(path: String, token: String?): Request = builder(path, token).get().build()
+    internal fun get(path: String, token: String?, vararg ids: String): Request =
+        builder(path, token, ids).get().build()
 
-    internal fun delete(path: String, token: String?): Request = builder(path, token).delete().build()
+    internal fun delete(path: String, token: String?, vararg ids: String): Request =
+        builder(path, token, ids).delete().build()
 
     /**
      * A POST with a JSON [body], or with an EMPTY body and no Content-Type when
      * [body] is null (the server rejects `application/json` with no content).
      */
-    internal fun post(path: String, body: String?, token: String? = null): Request =
-        builder(path, token).post(body?.toRequestBody(JSON_MEDIA) ?: EMPTY_BODY).build()
+    internal fun post(path: String, body: String?, token: String? = null, vararg ids: String): Request =
+        builder(path, token, ids).post(body?.toRequestBody(JSON_MEDIA) ?: EMPTY_BODY).build()
 
     internal suspend fun <T> call(request: Request, serializer: KSerializer<T>): ApiResult<T> =
         execute(request) { text ->

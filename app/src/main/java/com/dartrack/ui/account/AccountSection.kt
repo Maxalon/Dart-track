@@ -46,10 +46,11 @@ import kotlinx.coroutines.launch
  * The "Account" block at the top of Settings. Logged out: a short pitch and a
  * "Log in / Create account" button ([onLogIn]). Logged in: the username, the
  * "me" player (changeable via [MePlayerDialog]), "Change password" and
- * "Log out" (with a confirm; logging out keeps all local data).
+ * "Log out" (with a confirm; logging out keeps all local data), plus the
+ * Friends screen ([onFriends]).
  */
 @Composable
-fun AccountSection(onLogIn: () -> Unit) {
+fun AccountSection(onLogIn: () -> Unit, onFriends: () -> Unit) {
     val context = LocalContext.current
     val accountRepo = remember { AccountRepository.get(context) }
     val playerRepo = remember { PlayerRepository.get(context) }
@@ -87,6 +88,8 @@ fun AccountSection(onLogIn: () -> Unit) {
         )
         TextButton(onClick = { showMePicker = true }) { Text(if (meName == null) "Choose" else "Change") }
     }
+    Button(onClick = onFriends, modifier = Modifier.fillMaxWidth()) { Text("Friends") }
+    Spacer(Modifier.height(8.dp))
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         OutlinedButton(onClick = { showChangePassword = true }) { Text("Change password") }
         OutlinedButton(onClick = { showLogout = true }) { Text("Log out") }
