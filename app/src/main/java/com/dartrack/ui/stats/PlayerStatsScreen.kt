@@ -30,6 +30,7 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,8 +42,18 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.dartrack.data.AccountRepository
+import com.dartrack.data.FriendStatsRepository
+import com.dartrack.data.FriendStatsStatus
+import com.dartrack.data.FriendsRepository
 import com.dartrack.data.GameRepository
 import com.dartrack.data.H2HRecord
+import com.dartrack.data.StatsSubject
+import com.dartrack.data.friendStatsFor
+import com.dartrack.data.friendStatsNote
+import com.dartrack.data.friendsFor
+import com.dartrack.data.statsSubjects
+import com.dartrack.data.visibleHeadToHead
 import com.dartrack.data.PlayerStatsData
 import com.dartrack.data.PlayerRepository
 import com.dartrack.data.ScoreBandDistribution
@@ -54,6 +65,13 @@ import com.dartrack.data.playerStats
 import com.dartrack.data.threeDartAvgTrendById
 import com.dartrack.model.Player
 
+/**
+ * Per-player stats. The players offered follow [statsSubjects]: logged out,
+ * every local player; logged in, me, local guests and friends. A friend's
+ * numbers are the all-time snapshot they uploaded (fetched on open, cached
+ * offline); only the head-to-head between me and them is computed here, from
+ * our shared local games.
+ */
 @Composable
 fun PlayerStatsScreen(
     onBack: () -> Unit,
@@ -62,15 +80,30 @@ fun PlayerStatsScreen(
     val context = LocalContext.current
     val gameRepo = remember { GameRepository.get(context) }
     val playerRepo = remember { PlayerRepository.get(context) }
+    val accountRepo = remember { AccountRepository.get(context) }
+    val friendsRepo = remember { FriendsRepository.get(context) }
+    val friendStatsRepo = remember { FriendStatsRepository.get(context) }
 
     val games by gameRepo.games.collectAsState()
-    val players by playerRepo.players.collectAsState()
+    val allPlayers by playerRepo.players.collectAsState()
+    val account by accountRepo.account.collectAsState()
+    val friendsCache by friendsRepo.cache.collectAsState()
+    val friendStatsCache by friendStatsRepo.cache.collectAsState()
+    val friends = friendsFor(friendsCache, account).friends
+    val subjects = remember(allPlayers, account, friends) { statsSubjects(allPlayers, account, friends) }
+    val players = subjects.map { it.player }
+    val friendStats = friendStatsFor(friendStatsCache, account?.userId)
+    LaunchedEffect(account?.userId) {
+        friendStatsRepo.load()
+        if (account != null) friendStatsRepo.refresh(friendsFor(friendsRepo.cache.value, account).friends.map { it.id })
+    }
 
     var selectedId by remember { mutableStateOf<String?>(null) }
     // Default to the first player; keep the selection valid as the list changes.
-    val selected: Player? = remember(players, selectedId) {
-        players.firstOrNull { it.id == selectedId } ?: players.firstOrNull()
+    val selectedSubject: StatsSubject? = remember(subjects, selectedId) {
+        subjects.firstOrNull { it.player.id == selectedId } ?: subjects.firstOrNull()
     }
+    val selected: Player? = selectedSubject?.player
 
     Column(modifier = Modifier.fillMaxSize().statusBarsPadding().padding(8.dp)) {
         Row(
@@ -110,8 +143,32 @@ fun PlayerStatsScreen(
             players = players,
             selected = selected,
             onSelect = { selectedId = it.id },
+            friendIds = subjects.filter { it.isFriend }.mapTo(HashSet()) { it.player.id },
             modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
         )
+
+        if (selectedSubject?.isFriend == true) {
+            val fs = selected?.accountId?.let { friendStats[it] }
+            // Head-to-head with a friend: only our shared games, from this phone.
+            val meId = account?.mePlayerId
+            val h2h = remember(games, selected?.id, meId) {
+                headToHead(selected?.id.orEmpty(), games).filter { it.opponentId == meId }
+            }
+            FriendStatsBody(name = selected!!.name, status = fs?.status, computedAt = fs?.computedAt ?: 0) {
+                val snap = fs?.snapshot?.takeIf { fs.status == FriendStatsStatus.OK }
+                if (snap != null) {
+                    OverallCard(snap.stats)
+                    if (snap.stats.x01GamesPlayed > 0) {
+                        X01Card(snap.stats)
+                        ScoreBandCard(snap.stats.scoreBands)
+                    }
+                    TrendCard(snap.trend)
+                }
+                HeadToHeadCard(h2h)
+                if (snap != null) ModeSummariesCard(snap.stats)
+            }
+            return@Column
+        }
 
         var range by remember { mutableStateOf(StatsRange.ALL) }
         RangeSelector(
@@ -131,8 +188,8 @@ fun PlayerStatsScreen(
         val trend = remember(filtered, selected?.id) {
             threeDartAvgTrendById(selected?.id.orEmpty(), filtered)
         }
-        val h2h = remember(filtered, selected?.id) {
-            headToHead(selected?.id.orEmpty(), filtered)
+        val h2h = remember(filtered, selected?.id, subjects) {
+            visibleHeadToHead(headToHead(selected?.id.orEmpty(), filtered), allPlayers, subjects)
         }
 
         Column(
@@ -157,12 +214,50 @@ fun PlayerStatsScreen(
     }
 }
 
+/**
+ * A friend's stats: a caption (whose snapshot, from when) or the reason none
+ * can be shown, then [content] in the usual scrolling column. All-time only —
+ * the snapshot carries no per-period data, so there's no range selector.
+ */
+@Composable
+private fun FriendStatsBody(
+    name: String,
+    status: FriendStatsStatus?,
+    computedAt: Long,
+    content: @Composable () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .navigationBarsPadding(),
+    ) {
+        val note = friendStatsNote(name, status)
+        val caption = note ?: (
+            "All-time stats shared by $name" +
+                if (computedAt > 0) " · updated " + java.text.DateFormat.getDateTimeInstance(
+                    java.text.DateFormat.SHORT,
+                    java.text.DateFormat.SHORT,
+                ).format(java.util.Date(computedAt)) else ""
+            )
+        Text(
+            caption,
+            fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        )
+        content()
+        Spacer(Modifier.height(16.dp))
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PlayerSelector(
     players: List<Player>,
     selected: Player?,
     onSelect: (Player) -> Unit,
+    friendIds: Set<String> = emptySet(),
     modifier: Modifier = Modifier,
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -187,7 +282,7 @@ private fun PlayerSelector(
         ) {
             players.forEach { p ->
                 DropdownMenuItem(
-                    text = { Text(p.name) },
+                    text = { Text(if (p.id in friendIds) "${p.name} · friend" else p.name) },
                     onClick = {
                         onSelect(p)
                         expanded = false

@@ -19,6 +19,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -30,23 +31,51 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.dartrack.data.AccountRepository
+import com.dartrack.data.FriendStatsRepository
+import com.dartrack.data.FriendsRepository
 import com.dartrack.data.GameRepository
-import com.dartrack.data.StatsAggregator
+import com.dartrack.data.PlayerRepository
 import com.dartrack.data.StatsRange
 import com.dartrack.data.TrendStats
 import com.dartrack.data.filterByRange
+import com.dartrack.data.friendStatsFor
+import com.dartrack.data.friendStatsNote
+import com.dartrack.data.friendsFor
+import com.dartrack.data.gamesForNameStats
+import com.dartrack.data.statsOverview
 
+/**
+ * Statistics overview: one card per player name over the selected period.
+ * Who's covered follows [statsOverview] (logged in: me, local guests, and
+ * friends — whose cards show their own all-time snapshot, whatever the period).
+ */
 @Composable
 fun StatsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val repo = remember { GameRepository.get(context) }
     val games by repo.games.collectAsState()
+    val players by remember { PlayerRepository.get(context) }.players.collectAsState()
+    val accountRepo = remember { AccountRepository.get(context) }
+    val friendsRepo = remember { FriendsRepository.get(context) }
+    val friendStatsRepo = remember { FriendStatsRepository.get(context) }
+    val account by accountRepo.account.collectAsState()
+    val friendsCache by friendsRepo.cache.collectAsState()
+    val friendStatsCache by friendStatsRepo.cache.collectAsState()
+    val friends = friendsFor(friendsCache, account).friends
+    val friendStats = friendStatsFor(friendStatsCache, account?.userId)
+    LaunchedEffect(account?.userId) {
+        friendStatsRepo.load()
+        if (account != null) friendStatsRepo.refresh(friendsFor(friendsRepo.cache.value, account).friends.map { it.id })
+    }
 
     var range by remember { mutableStateOf(StatsRange.ALL) }
     val filtered = remember(games, range) {
         filterByRange(games, range, System.currentTimeMillis())
     }
-    val stats = remember(filtered) { StatsAggregator.aggregate(filtered) }
+    val stats = remember(filtered, players, account, friends, friendStats) {
+        statsOverview(filtered, players, account, friends, friendStats)
+    }
 
     Column(modifier = Modifier.fillMaxSize().statusBarsPadding().padding(8.dp)) {
         Row(
@@ -74,10 +103,19 @@ fun StatsScreen(onBack: () -> Unit) {
             LazyColumn(
                 contentPadding = WindowInsets.navigationBars.asPaddingValues(),
             ) {
-                items(stats, key = { it.name }) { s ->
+                items(stats, key = { (if (it.isFriend) "f:" else "l:") + it.name }) { entry ->
+                    val s = entry.stats
                     Card(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
                         Column(modifier = Modifier.padding(12.dp)) {
-                            Text(s.name, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                            Text(entry.name, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                            if (entry.isFriend) {
+                                Text(
+                                    friendStatsNote(entry.name, entry.friendStatus) ?: "Friend · all-time stats they shared",
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            if (s == null) return@Column
                             Text("Games: ${s.gamesPlayed} · wins: ${s.gamesWon}")
                             if (s.x01GamesPlayed > 0) {
                                 Spacer(Modifier.height(6.dp))
@@ -101,8 +139,9 @@ fun StatsScreen(onBack: () -> Unit) {
                                 Text("Best leg: $bestLeg · " +
                                     "avg darts/leg ${"%.1f".format(s.x01AvgDartsPerLeg)}")
 
-                                val trend = remember(filtered, s.name) {
-                                    TrendStats.threeDartAverageTrend(filtered, s.name)
+                                val trend = remember(filtered, s.name, entry) {
+                                    entry.friendTrend
+                                        ?: TrendStats.threeDartAverageTrend(gamesForNameStats(filtered), s.name)
                                 }
                                 if (trend.isNotEmpty()) {
                                     Spacer(Modifier.height(8.dp))

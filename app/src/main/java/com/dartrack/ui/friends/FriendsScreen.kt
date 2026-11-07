@@ -41,7 +41,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dartrack.data.AccountRepository
 import com.dartrack.data.FriendsRepository
+import com.dartrack.data.PlayerRepository
+import com.dartrack.data.SyncManager
 import com.dartrack.data.friendsFor
+import com.dartrack.data.transferableGuests
+import com.dartrack.ui.players.TransferGuestDialog
 import com.dartrack.net.ApiResult
 import com.dartrack.net.FriendEntry
 import com.dartrack.net.userMessage
@@ -50,8 +54,9 @@ import kotlinx.coroutines.launch
 /**
  * Friends: an "Add friend" field (exact username, case ignored) with result
  * feedback, then Requests (accept / decline), Friends (remove, confirmed) and
- * Sent (cancel). Pull down to refresh; it also refreshes on open. Shows the
- * cached list when offline. Logged out, it only shows a "log in" hint
+ * Sent (cancel). Pull down to refresh (which also syncs game history); it also
+ * refreshes on open. A friend's "Move games" moves a local guest's games to
+ * them ([TransferGuestDialog]). Shows the cached list when offline. Logged out, it only shows a "log in" hint
  * ([onLogIn]). Header idiom matches SettingsScreen.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -66,7 +71,10 @@ fun FriendsScreen(
     val account by accountRepo.account.collectAsState()
     val cache by friendsRepo.cache.collectAsState()
     val refreshing by friendsRepo.refreshing.collectAsState()
+    val sync = remember { SyncManager.get(context) }
+    val players by remember { PlayerRepository.get(context) }.players.collectAsState()
     val scope = rememberCoroutineScope()
+    var transferTo by remember { mutableStateOf<FriendEntry?>(null) }
 
     // Feedback line under the add field / the last action's error.
     var feedback by remember { mutableStateOf<Pair<String, Boolean>?>(null) } // text, isError
@@ -156,7 +164,10 @@ fun FriendsScreen(
 
         PullToRefreshBox(
             isRefreshing = refreshing,
-            onRefresh = { refresh() },
+            onRefresh = {
+                refresh()
+                sync.requestSync()
+            },
             modifier = Modifier.fillMaxSize(),
         ) {
             LazyColumn(
@@ -221,8 +232,12 @@ fun FriendsScreen(
                 if (list.friends.isEmpty()) {
                     item { EmptyHint("No friends yet. Add someone by their username.") }
                 }
+                val hasGuests = transferableGuests(players, account?.mePlayerId).isNotEmpty()
                 items(list.friends, key = { "f-" + it.id }) { friend ->
                     PersonRow(friend.username) {
+                        if (hasGuests) {
+                            TextButton(enabled = !busy, onClick = { transferTo = friend }) { Text("Move games") }
+                        }
                         TextButton(enabled = !busy, onClick = { removeTarget = friend }) { Text("Remove") }
                     }
                 }
@@ -241,6 +256,17 @@ fun FriendsScreen(
                 item { Spacer(Modifier.height(24.dp)) }
             }
         }
+    }
+
+    transferTo?.let { target ->
+        TransferGuestDialog(
+            initialFriend = target,
+            onDismiss = { transferTo = null },
+            onDone = { msg ->
+                transferTo = null
+                feedback = msg to false
+            },
+        )
     }
 
     removeTarget?.let { target ->

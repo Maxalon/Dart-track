@@ -18,6 +18,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -36,10 +37,12 @@ import androidx.compose.ui.unit.sp
 import com.dartrack.data.Account
 import com.dartrack.data.AccountRepository
 import com.dartrack.data.PlayerRepository
+import com.dartrack.data.SyncManager
 import com.dartrack.data.eligibleMePlayers
 import com.dartrack.data.normalizePlayerName
 import com.dartrack.net.ApiResult
 import com.dartrack.net.userMessage
+import com.dartrack.ui.sync.SyncStatusLine
 import kotlinx.coroutines.launch
 
 /**
@@ -47,7 +50,8 @@ import kotlinx.coroutines.launch
  * "Log in / Create account" button ([onLogIn]). Logged in: the username, the
  * "me" player (changeable via [MePlayerDialog]), "Change password" and
  * "Log out" (with a confirm; logging out keeps all local data), plus the
- * Friends screen ([onFriends]).
+ * Friends screen ([onFriends]), the game-history sync status ("Sync now") and
+ * the "Hide my stats from friends" switch.
  */
 @Composable
 fun AccountSection(onLogIn: () -> Unit, onFriends: () -> Unit) {
@@ -56,8 +60,12 @@ fun AccountSection(onLogIn: () -> Unit, onFriends: () -> Unit) {
     val playerRepo = remember { PlayerRepository.get(context) }
     val account by accountRepo.account.collectAsState()
     val players by playerRepo.players.collectAsState()
+    val sync = remember { SyncManager.get(context) }
+    val syncStatus by sync.status.collectAsState()
     val scope = rememberCoroutineScope()
 
+    var statsError by remember { mutableStateOf<String?>(null) }
+    var savingStats by remember { mutableStateOf(false) }
     var showMePicker by remember { mutableStateOf(false) }
     var showChangePassword by remember { mutableStateOf(false) }
     var showLogout by remember { mutableStateOf(false) }
@@ -65,7 +73,8 @@ fun AccountSection(onLogIn: () -> Unit, onFriends: () -> Unit) {
     val acc = account
     if (acc == null) {
         Text(
-            "Optional — log in to add friends. The app works fully offline without an account.",
+            "Optional — log in to add friends and sync your games and stats with them. " +
+                "The app works fully offline without an account.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -89,6 +98,40 @@ fun AccountSection(onLogIn: () -> Unit, onFriends: () -> Unit) {
         TextButton(onClick = { showMePicker = true }) { Text(if (meName == null) "Choose" else "Change") }
     }
     Button(onClick = onFriends, modifier = Modifier.fillMaxWidth()) { Text("Friends") }
+    Spacer(Modifier.height(4.dp))
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        SyncStatusLine(syncStatus, modifier = Modifier.weight(1f))
+        TextButton(enabled = !syncStatus.running, onClick = { sync.requestSync() }) { Text("Sync now") }
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text("Hide my stats from friends")
+            Text(
+                statsError ?: "Friends still see the games you played together.",
+                fontSize = 12.sp,
+                color = if (statsError != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Switch(
+            checked = acc.statsHidden,
+            enabled = !savingStats,
+            onCheckedChange = { hidden ->
+                savingStats = true
+                statsError = null
+                scope.launch {
+                    val result = accountRepo.setStatsHidden(hidden)
+                    savingStats = false
+                    if (result is ApiResult.Failure) statsError = result.userMessage()
+                }
+            },
+        )
+    }
     Spacer(Modifier.height(8.dp))
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         OutlinedButton(onClick = { showChangePassword = true }) { Text("Change password") }

@@ -18,6 +18,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -27,11 +28,18 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.dartrack.data.AccountRepository
+import com.dartrack.data.FriendStatsRepository
+import com.dartrack.data.FriendsRepository
 import com.dartrack.data.GameRepository
 import com.dartrack.data.LeaderboardCategory
 import com.dartrack.data.LeaderboardEntry
 import com.dartrack.data.PlayerRepository
 import com.dartrack.data.allLeaderboards
+import com.dartrack.data.friendStatsFor
+import com.dartrack.data.friendsFor
+import com.dartrack.data.leaderboardInputs
+import com.dartrack.data.statsSubjects
 
 /**
  * Cross-player leaderboards & records. Reads the same [GameRepository] /
@@ -42,6 +50,9 @@ import com.dartrack.data.allLeaderboards
  * One [Card] per [LeaderboardCategory] (iterated via `values()` for a stable,
  * catalog order). A category with no qualifying entries shows a muted placeholder
  * rather than being hidden, so the board reads the same regardless of data.
+ *
+ * Who's ranked follows [statsSubjects]; logged in, friends are ranked on the
+ * all-time stats snapshot they shared ([leaderboardInputs]).
  */
 @Composable
 fun LeaderboardsScreen(onBack: () -> Unit) {
@@ -50,10 +61,27 @@ fun LeaderboardsScreen(onBack: () -> Unit) {
     val playerRepo = remember { PlayerRepository.get(context) }
 
     val games by gameRepo.games.collectAsState()
-    val players by playerRepo.players.collectAsState()
+    val allPlayers by playerRepo.players.collectAsState()
+    val accountRepo = remember { AccountRepository.get(context) }
+    val friendsRepo = remember { FriendsRepository.get(context) }
+    val friendStatsRepo = remember { FriendStatsRepository.get(context) }
+    val account by accountRepo.account.collectAsState()
+    val friendsCache by friendsRepo.cache.collectAsState()
+    val friendStatsCache by friendStatsRepo.cache.collectAsState()
+    LaunchedEffect(account?.userId) {
+        friendStatsRepo.load()
+        if (account != null) friendStatsRepo.refresh(friendsFor(friendsRepo.cache.value, account).friends.map { it.id })
+    }
+    val inputs = remember(allPlayers, account, friendsCache, friendStatsCache) {
+        leaderboardInputs(
+            statsSubjects(allPlayers, account, friendsFor(friendsCache, account).friends),
+            friendStatsFor(friendStatsCache, account?.userId),
+        )
+    }
+    val players = inputs.players
 
     // All rankings recomputed only when the inputs change; pure, no Context needed.
-    val boards = remember(games, players) { allLeaderboards(games, players) }
+    val boards = remember(games, inputs) { allLeaderboards(games, players, statsOverride = inputs.statsOverride) }
 
     Column(modifier = Modifier.fillMaxSize().statusBarsPadding().padding(8.dp)) {
         Row(
@@ -70,7 +98,7 @@ fun LeaderboardsScreen(onBack: () -> Unit) {
         }
         Spacer(Modifier.height(4.dp))
 
-        if (players.isEmpty() || games.isEmpty()) {
+        if (players.isEmpty() || (games.isEmpty() && inputs.statsOverride.isEmpty())) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(
                     "No games yet. Play some games to build the leaderboards.",

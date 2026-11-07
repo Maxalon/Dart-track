@@ -40,9 +40,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.dartrack.data.AccountRepository
+import com.dartrack.data.FriendsRepository
 import com.dartrack.data.GameRepository
 import com.dartrack.data.PlayerRepository
+import com.dartrack.data.friendsFor
 import com.dartrack.data.normalizePlayerName
+import com.dartrack.data.transferableGuests
+import com.dartrack.data.visiblePlayers
 import com.dartrack.model.Player
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
@@ -52,7 +57,8 @@ import androidx.compose.runtime.rememberCoroutineScope
  * registry from [PlayerRepository]; mutations run on a coroutine scope and
  * surface a brief Toast. Merge reassigns a source player's games to a target
  * (via [PlayerRepository.merge] -> [GameRepository.reassignPlayer]) then drops
- * the source from the registry.
+ * the source from the registry. Logged in, "Move a guest's games to a friend"
+ * opens [TransferGuestDialog]. Hidden players (synced strangers) aren't listed.
  */
 @Composable
 fun PlayerManagementScreen(onBack: () -> Unit) {
@@ -61,7 +67,16 @@ fun PlayerManagementScreen(onBack: () -> Unit) {
     val gameRepo = remember { GameRepository.get(context) }
     val scope = rememberCoroutineScope()
 
-    val players by playerRepo.players.collectAsState()
+    val allPlayers by playerRepo.players.collectAsState()
+    val players = visiblePlayers(allPlayers)
+    val accountRepo = remember { AccountRepository.get(context) }
+    val friendsRepo = remember { FriendsRepository.get(context) }
+    val account by accountRepo.account.collectAsState()
+    val friendsCache by friendsRepo.cache.collectAsState()
+    val canTransfer = account != null &&
+        friendsFor(friendsCache, account).friends.isNotEmpty() &&
+        transferableGuests(allPlayers, account?.mePlayerId).isNotEmpty()
+    var showTransfer by remember { mutableStateOf(false) }
 
     var renameTarget by remember { mutableStateOf<Player?>(null) }
     var deleteTarget by remember { mutableStateOf<Player?>(null) }
@@ -100,6 +115,14 @@ fun PlayerManagementScreen(onBack: () -> Unit) {
             modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
         ) {
             Text("Merge players")
+        }
+        if (canTransfer) {
+            OutlinedButton(
+                onClick = { showTransfer = true },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+            ) {
+                Text("Move a guest's games to a friend")
+            }
         }
         Spacer(Modifier.height(8.dp))
 
@@ -153,6 +176,16 @@ fun PlayerManagementScreen(onBack: () -> Unit) {
             },
             dismissButton = {
                 TextButton(onClick = { deleteTarget = null }) { Text("Cancel") }
+            },
+        )
+    }
+
+    if (showTransfer) {
+        TransferGuestDialog(
+            onDismiss = { showTransfer = false },
+            onDone = { msg ->
+                showTransfer = false
+                toast(msg)
             },
         )
     }
