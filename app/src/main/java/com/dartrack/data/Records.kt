@@ -3,6 +3,7 @@ package com.dartrack.data
 import com.dartrack.model.Player
 import com.dartrack.model.X01State
 import com.dartrack.model.X01Stats
+import kotlinx.serialization.Serializable
 import kotlin.math.roundToInt
 
 /**
@@ -76,13 +77,16 @@ fun leaderboard(
     games: List<GameRecord>,
     players: List<Player>,
     minGames: Int = 1,
+    statsOverride: Map<String, PlayerStatsData> = emptyMap(),
 ): List<LeaderboardEntry> {
     // One stats payload per registered player (deduped by id; the registry should
     // already be unique, but a duplicate id would otherwise double-rank a player).
+    // A player in [statsOverride] (a friend, whose own uploaded snapshot replaces
+    // what this phone happens to have) is ranked on that payload instead.
     val computed = players
         .distinctBy { it.id }
         .mapNotNull { player ->
-            val stats = playerStats(player.id, games)
+            val stats = statsOverride[player.id] ?: playerStats(player.id, games)
             if (stats.gamesPlayed < minGames) return@mapNotNull null
             if (!category.qualifies(stats)) return@mapNotNull null
             Triple(player, stats, category.metric(stats))
@@ -124,8 +128,9 @@ fun allLeaderboards(
     games: List<GameRecord>,
     players: List<Player>,
     minGames: Int = 1,
+    statsOverride: Map<String, PlayerStatsData> = emptyMap(),
 ): Map<LeaderboardCategory, List<LeaderboardEntry>> =
-    LeaderboardCategory.values().associateWith { leaderboard(it, games, players, minGames) }
+    LeaderboardCategory.values().associateWith { leaderboard(it, games, players, minGames, statsOverride) }
 
 /**
  * Whether [stats] has any data to rank for this category beyond the [minGames]
@@ -187,6 +192,7 @@ private fun oneDecimal(value: Double): String {
  * Everything is 0 (or 0.0) when the player has no qualifying data, e.g. a player
  * who never threw an X01 game reports zero across all the X01 bests.
  */
+@Serializable
 data class PlayerRecords(
     val playerId: String,
     // Overall.
@@ -214,6 +220,8 @@ data class PlayerRecords(
     val bestCatch40: Int,
     /** Fewest darts to clear the board in a won Around-the-Clock game (0 if none). */
     val bestAroundTheClockDarts: Int,
+    /** Highest single (non-bust) X01 visit (0 if none). */
+    val highestVisit: Int = 0,
 )
 
 /**
@@ -231,6 +239,7 @@ fun playerRecords(playerId: String, games: List<GameRecord>): PlayerRecords {
     var bestGameAvg = 0.0
     var most180sInGame = 0
     var highestCheckout = 0
+    var highestVisit = 0
     if (playerId.isNotBlank()) {
         for (r in games) {
             val state = r.state as? X01State ?: continue
@@ -246,6 +255,8 @@ fun playerRecords(playerId: String, games: List<GameRecord>): PlayerRecords {
                 ps.turns.count { !it.bust && it.entered == 180 }
             }
             if (gameOneEighties > most180sInGame) most180sInGame = gameOneEighties
+
+            highestVisit = maxOf(highestVisit, X01Stats.highestTurn(legStates))
 
             X01Stats.highestCheckout(legStates)?.let { co ->
                 if (co > highestCheckout) highestCheckout = co
@@ -271,5 +282,6 @@ fun playerRecords(playerId: String, games: List<GameRecord>): PlayerRecords {
         bestBobs27 = stats.bobs27.best,
         bestCatch40 = stats.catch40.best,
         bestAroundTheClockDarts = stats.aroundTheClock.best,
+        highestVisit = highestVisit,
     )
 }

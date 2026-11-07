@@ -2,12 +2,14 @@ package com.dartrack.data
 
 import com.dartrack.model.X01State
 import com.dartrack.model.X01Stats
+import kotlinx.serialization.Serializable
 
 /**
  * One data point on a player's 3-dart-average trend: the time the game was
  * played ([timeMs], from the record's [GameRecord.createdAtEpochMs]) and that
  * player's 3-dart average in that single game.
  */
+@Serializable
 data class TrendPoint(
     val timeMs: Long,
     val threeDartAvg: Double,

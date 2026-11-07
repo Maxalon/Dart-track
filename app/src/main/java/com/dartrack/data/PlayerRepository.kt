@@ -24,14 +24,19 @@ import java.util.UUID
  * normalized name already exists it is RETURNED unchanged rather than creating
  * a duplicate. Blank names are rejected with [IllegalArgumentException].
  */
-class PlayerRepository private constructor(private val file: File) {
+class PlayerRepository internal constructor(private val file: File) {
 
     private val mutex = Mutex()
     private val _players = MutableStateFlow<List<Player>>(emptyList())
     val players: StateFlow<List<Player>> = _players.asStateFlow()
 
+    /** True once [load] has read the file (sync must not write before that). */
+    @Volatile var isLoaded: Boolean = false
+        private set
+
     suspend fun load() = withContext(Dispatchers.IO) {
         mutex.withLock {
+            isLoaded = true
             if (!file.exists()) {
                 _players.value = emptyList()
                 return@withLock
@@ -73,7 +78,7 @@ class PlayerRepository private constructor(private val file: File) {
      */
     suspend fun playerForAccount(accountId: String, name: String): Player = withContext(Dispatchers.IO) {
         mutex.withLock {
-            val outcome = resolveAccountPlayer(_players.value, accountId, name) { UUID.randomUUID().toString() }
+            val outcome = resolveAccountPlayer(_players.value, accountId, name, { UUID.randomUUID().toString() })
             if (outcome.changed) persistLocked(outcome.players)
             outcome.added
         }
@@ -81,6 +86,20 @@ class PlayerRepository private constructor(private val file: File) {
 
     /** The player linked to server account [accountId], if any. */
     fun findByAccount(accountId: String): Player? = findPlayerByAccount(_players.value, accountId)
+
+    /**
+     * Get-or-create the local players for several accounts at once (one write),
+     * as needed when applying games downloaded by sync. See
+     * [resolveAccountPlayers]. Returns accountId -> player.
+     */
+    suspend fun playersForAccounts(specs: List<AccountPlayerSpec>): Map<String, Player> =
+        withContext(Dispatchers.IO) {
+            mutex.withLock {
+                val outcome = resolveAccountPlayers(_players.value, specs) { UUID.randomUUID().toString() }
+                if (outcome.players != _players.value) persistLocked(outcome.players)
+                outcome.byAccount
+            }
+        }
 
     /**
      * Links player [playerId] to server account [accountId] (see
@@ -211,14 +230,35 @@ fun resolveAddPlayer(
     require(trimmed.isNotEmpty()) { "Player name must not be blank" }
     val key = normalizePlayerName(trimmed)
     val match = existing.firstOrNull { normalizePlayerName(it.name) == key }
-    if (match != null) {
+    if (match != null && !match.hidden) {
         return AddPlayerOutcome(players = existing, added = match, changed = false)
     }
-    val usedIds = existing.mapTo(HashSet()) { it.id }
+    // A hidden (synced, non-friend) player holding the name must not be handed
+    // out as a local player: it moves aside to a free "name (2)" and the typed
+    // name goes to a new visible player.
+    val base = if (match == null) existing else existing.map {
+        if (it.id == match.id) it.copy(name = freeName(existing, it.name, " (", ")", startAt = 2)) else it
+    }
+    val usedIds = base.mapTo(HashSet()) { it.id }
     var id = idGenerator()
     while (id in usedIds) id = idGenerator()
     val created = Player(id = id, name = trimmed)
-    return AddPlayerOutcome(players = existing + created, added = created, changed = true)
+    return AddPlayerOutcome(players = base + created, added = created, changed = true)
+}
+
+/**
+ * The first of `name`, `name<open>N<close>`… (N counting up from [startAt])
+ * not used case-insensitively by any of [existing].
+ */
+private fun freeName(existing: List<Player>, name: String, open: String, close: String, startAt: Int): String {
+    val taken = existing.mapTo(HashSet()) { normalizePlayerName(it.name) }
+    var n = startAt
+    var candidate = "$name$open$n$close"
+    while (normalizePlayerName(candidate) in taken) {
+        n++
+        candidate = "$name$open$n$close"
+    }
+    return candidate
 }
 
 /** Stable ordering for the registry: by name (case-insensitive), then id. */
@@ -278,19 +318,26 @@ fun linkPlayerToAccount(existing: List<Player>, playerId: String, accountId: Str
 /**
  * Pure get-or-create of the player linked to [accountId]. An already linked
  * player is returned unchanged (whatever its local name), so repeated calls
- * never duplicate. Otherwise a new linked player is created named [name]; if
- * that name is taken by an unrelated local player (who is NOT silently linked —
- * that would merge histories), it becomes "name (friend)", then
- * "name (friend 2)", … to keep names unique.
+ * never duplicate — except that a [hidden] = false request reveals a hidden
+ * one (a synced stranger who has since become a friend). Otherwise a new
+ * linked player is created named [name] (hidden when [hidden]); if that name
+ * is taken by an unrelated local player (who is NOT silently linked — that
+ * would merge histories), it becomes "name (friend)", then "name (friend 2)",
+ * … to keep names unique.
  */
 fun resolveAccountPlayer(
     existing: List<Player>,
     accountId: String,
     name: String,
     idGenerator: () -> String,
+    hidden: Boolean = false,
 ): AddPlayerOutcome {
-    findPlayerByAccount(existing, accountId)?.let {
-        return AddPlayerOutcome(players = existing, added = it, changed = false)
+    findPlayerByAccount(existing, accountId)?.let { found ->
+        if (found.hidden && !hidden) {
+            val shown = found.copy(hidden = false)
+            return AddPlayerOutcome(existing.map { if (it.id == found.id) shown else it }, shown, changed = true)
+        }
+        return AddPlayerOutcome(players = existing, added = found, changed = false)
     }
     val base = name.trim()
     require(base.isNotEmpty()) { "Player name must not be blank" }
@@ -304,9 +351,38 @@ fun resolveAccountPlayer(
     val usedIds = existing.mapTo(HashSet()) { it.id }
     var id = idGenerator()
     while (id in usedIds) id = idGenerator()
-    val created = Player(id = id, name = candidate, accountId = accountId)
+    val created = Player(id = id, name = candidate, accountId = accountId, hidden = hidden)
     return AddPlayerOutcome(players = existing + created, added = created, changed = true)
 }
+
+/** One account seen in a downloaded game: its id, username and whether to hide it. */
+data class AccountPlayerSpec(val accountId: String, val name: String, val hidden: Boolean)
+
+/** Result of [resolveAccountPlayers]: the new registry and accountId -> player. */
+data class AccountPlayersOutcome(val players: List<Player>, val byAccount: Map<String, Player>)
+
+/**
+ * [resolveAccountPlayer] for several accounts in a row (later specs see the
+ * players earlier ones created). A spec repeated for the same account resolves
+ * to the same player.
+ */
+fun resolveAccountPlayers(
+    existing: List<Player>,
+    specs: List<AccountPlayerSpec>,
+    idGenerator: () -> String,
+): AccountPlayersOutcome {
+    var players = existing
+    val byAccount = LinkedHashMap<String, Player>()
+    for (spec in specs) {
+        val outcome = resolveAccountPlayer(players, spec.accountId, spec.name, idGenerator, spec.hidden)
+        players = outcome.players
+        byAccount[spec.accountId] = outcome.added
+    }
+    return AccountPlayersOutcome(players, byAccount)
+}
+
+/** Players shown in pickers, player management and stats: everyone not [Player.hidden]. */
+fun visiblePlayers(players: List<Player>): List<Player> = players.filterNot { it.hidden }
 
 /** Pure removal of the player [id] from [existing] (no-op if absent). */
 fun removePlayer(existing: List<Player>, id: String): List<Player> =

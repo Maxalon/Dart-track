@@ -5,6 +5,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType.Companion.toMediaType
@@ -72,6 +73,91 @@ data class FriendRequestResult(val status: String, val user: ApiUser) {
 
 @Serializable
 private data class FriendRequestBody(val username: String)
+
+// ---- Game sync ----------------------------------------------------------------
+
+/**
+ * One account seat of an uploaded game. [linkId] is set only on the upload that
+ * moves a transferred guest's game into that friend's history (POST /v1/links).
+ */
+@Serializable
+data class UploadParticipant(val userId: String, val seat: Int, val linkId: String? = null)
+
+/**
+ * One game for `POST /v1/games`: the complete local GameRecord as [record]
+ * (verbatim; the server never reads inside it) plus client [meta].
+ * [status] is `finished`, `unfinished` or `abandoned`.
+ */
+@Serializable
+data class GameUpload(
+    val id: String,
+    val mode: String,
+    val status: String,
+    val createdAt: Long,
+    val updatedAt: Long,
+    val record: JsonObject,
+    val meta: JsonObject? = null,
+    val participants: List<UploadParticipant>,
+)
+
+@Serializable
+private data class UploadBody(val games: List<GameUpload>)
+
+/** Per-game answer: `stored`, `unchanged`, `deleted`, `purged` or `rejected` (with [error]). */
+@Serializable
+data class UploadResult(val id: String, val result: String, val error: String? = null)
+
+@Serializable
+data class UploadResponse(val results: List<UploadResult> = emptyList())
+
+/** An account seat in a downloaded game. */
+@Serializable
+data class RemoteParticipant(val userId: String, val username: String = "", val seat: Int)
+
+/** One game from `GET /v1/games`, as some phone uploaded it. */
+@Serializable
+data class RemoteGame(
+    val id: String,
+    val mode: String = "",
+    val status: String = "",
+    val createdAt: Long = 0,
+    val updatedAt: Long = 0,
+    val record: JsonObject,
+    val meta: JsonObject? = null,
+    val uploadedBy: String? = null,
+    val participants: List<RemoteParticipant> = emptyList(),
+)
+
+/** A page of `GET /v1/games`: what changed since the cursor, and the next cursor. */
+@Serializable
+data class GamesPage(
+    val games: List<RemoteGame> = emptyList(),
+    val deleted: List<String> = emptyList(),
+    val cursor: Long = 0,
+    val hasMore: Boolean = false,
+)
+
+// ---- Guest transfer & stats ----------------------------------------------------
+
+@Serializable
+private data class LinkBody(val friendId: String, val guestName: String)
+
+/** An active guest → friend transfer created by this account. */
+@Serializable
+data class LinkEntry(val id: String, val friendId: String, val guestName: String = "", val createdAt: Long = 0)
+
+@Serializable
+data class LinksList(val links: List<LinkEntry> = emptyList())
+
+@Serializable
+private data class StatsBody(val snapshot: JsonObject, val computedAt: Long)
+
+@Serializable
+private data class MePatchBody(val statsHidden: Boolean)
+
+/** A friend's uploaded stats snapshot (opaque to the server). */
+@Serializable
+data class FriendStatsResponse(val snapshot: JsonObject, val computedAt: Long = 0, val updatedAt: Long = 0)
 
 @Serializable
 private data class SignupBody(val username: String, val password: String, val deviceName: String?)
@@ -165,6 +251,54 @@ class ApiClient(
     suspend fun removeFriend(token: String, userId: String): ApiResult<Unit> =
         callUnit(delete("v1/friends/{}", token, userId))
 
+    // ---- Game sync ----------------------------------------------------------
+
+    /** Uploads up to 100 games (the app sends at most [SYNC_BATCH] per call). */
+    suspend fun uploadGames(token: String, games: List<GameUpload>): ApiResult<UploadResponse> =
+        call(post("v1/games", json.encodeToString(UploadBody.serializer(), UploadBody(games)), token), UploadResponse.serializer())
+
+    /** What changed for this account after [since] (a cursor from the previous page; 0 = everything). */
+    suspend fun gamesSince(token: String, since: Long, limit: Int = 100): ApiResult<GamesPage> {
+        val url = url("v1/games", emptyArray()).newBuilder()
+            .addQueryParameter("since", since.toString())
+            .addQueryParameter("limit", limit.toString())
+            .build()
+        val request = Request.Builder().url(url).header("Authorization", "Bearer $token").get().build()
+        return call(request, GamesPage.serializer())
+    }
+
+    /** Removes the game from this account's history only. */
+    suspend fun deleteGame(token: String, gameId: String): ApiResult<Unit> =
+        callUnit(delete("v1/games/{}", token, gameId))
+
+    // ---- Guest transfer -----------------------------------------------------
+
+    suspend fun createLink(token: String, friendId: String, guestName: String): ApiResult<LinkEntry> =
+        call(post("v1/links", json.encodeToString(LinkBody.serializer(), LinkBody(friendId, guestName)), token), LinkEntry.serializer())
+
+    suspend fun links(token: String): ApiResult<LinksList> =
+        call(get("v1/links", token), LinksList.serializer())
+
+    // ---- Stats --------------------------------------------------------------
+
+    suspend fun putMyStats(token: String, snapshot: JsonObject, computedAt: Long): ApiResult<Unit> =
+        callUnit(
+            builder("v1/me/stats", token, emptyArray())
+                .put(json.encodeToString(StatsBody.serializer(), StatsBody(snapshot, computedAt)).toRequestBody(JSON_MEDIA))
+                .build(),
+        )
+
+    suspend fun setStatsHidden(token: String, hidden: Boolean): ApiResult<MeResponse> =
+        call(
+            builder("v1/me", token, emptyArray())
+                .patch(json.encodeToString(MePatchBody.serializer(), MePatchBody(hidden)).toRequestBody(JSON_MEDIA))
+                .build(),
+            MeResponse.serializer(),
+        )
+
+    suspend fun friendStats(token: String, friendId: String): ApiResult<FriendStatsResponse> =
+        call(get("v1/friends/{}/stats", token, friendId), FriendStatsResponse.serializer())
+
     // ---- Request plumbing ---------------------------------------------------
 
     /**
@@ -236,6 +370,9 @@ class ApiClient(
             explicitNulls = false
         }
 
+        /** Most games per upload call (the server accepts 100). */
+        const val SYNC_BATCH = 50
+
         private val JSON_MEDIA = "application/json; charset=utf-8".toMediaType()
         private val EMPTY_BODY: RequestBody = ByteArray(0).toRequestBody(null)
 
@@ -267,6 +404,9 @@ fun ApiResult.Failure.userMessage(): String = when (this) {
         "already_requested" -> "You've already sent a request."
         "request_not_found" -> "That request no longer exists."
         "not_friends" -> "You're not friends anymore."
+        "already_linked" -> "You've already moved a guest to this friend."
+        "stats_hidden" -> "They hide their stats."
+        "no_stats" -> "No stats yet."
         else -> when {
             status == 401 -> "You were logged out — log in again."
             status == 429 -> "Too many attempts. Wait a minute and try again."

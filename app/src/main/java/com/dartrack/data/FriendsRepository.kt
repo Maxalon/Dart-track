@@ -37,7 +37,7 @@ data class FriendsCache(
  * goes through [AccountRepository.authed] (a 401 logs out) and re-fetches the
  * list on success, so the server stays the single source of truth.
  */
-class FriendsRepository private constructor(
+class FriendsRepository internal constructor(
     private val file: File,
     private val accounts: AccountRepository,
     private val players: PlayerRepository,
@@ -156,7 +156,7 @@ data class PlayerOption(val player: Player?, val friend: FriendEntry?) {
 }
 
 /**
- * Builds the picker list: every local player (marked as a friend when it is
+ * Builds the picker list: every visible local player (marked as a friend when it is
  * linked to one of [friends]) plus each friend who has no local player yet.
  * Sorted by name, except that the [mePlayerId] player (the logged-in user)
  * comes first.
@@ -167,8 +167,11 @@ fun playerOptions(
     mePlayerId: String? = null,
 ): List<PlayerOption> {
     val friendsById = friends.associateBy { it.id }
-    val linked = players.mapNotNullTo(HashSet()) { it.accountId }
-    val local = players.map { p -> PlayerOption(p, p.accountId?.let { friendsById[it] }) }
+    // A hidden player (a synced stranger) is never offered; a friend whose only
+    // local player is still hidden shows as a friend-only entry instead (picking
+    // it reveals that player via playerFor).
+    val linked = players.filterNot { it.hidden }.mapNotNullTo(HashSet()) { it.accountId }
+    val local = players.filterNot { it.hidden }.map { p -> PlayerOption(p, p.accountId?.let { friendsById[it] }) }
     val friendOnly = friends.filter { it.id !in linked }.map { PlayerOption(null, it) }
     return (local + friendOnly).sortedWith(
         compareBy<PlayerOption>({ it.player?.id != mePlayerId || mePlayerId == null }, { it.name.lowercase() }),
