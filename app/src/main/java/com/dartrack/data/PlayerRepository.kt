@@ -67,6 +67,37 @@ class PlayerRepository private constructor(private val file: File) {
 
     fun byId(id: String): Player? = _players.value.firstOrNull { it.id == id }
 
+    /**
+     * The local player for server account [accountId] (e.g. a friend), created
+     * on the fly as [name] if none is linked yet. See [resolveAccountPlayer].
+     */
+    suspend fun playerForAccount(accountId: String, name: String): Player = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            val outcome = resolveAccountPlayer(_players.value, accountId, name) { UUID.randomUUID().toString() }
+            if (outcome.changed) persistLocked(outcome.players)
+            outcome.added
+        }
+    }
+
+    /** The player linked to server account [accountId], if any. */
+    fun findByAccount(accountId: String): Player? = findPlayerByAccount(_players.value, accountId)
+
+    /**
+     * Links player [playerId] to server account [accountId] (see
+     * [linkPlayerToAccount]: any other player linked to the same account is
+     * unlinked). Returns false (and persists nothing) if [playerId] is missing
+     * or already linked exactly so.
+     */
+    suspend fun linkToAccount(playerId: String, accountId: String): Boolean = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            val current = _players.value
+            val next = linkPlayerToAccount(current, playerId, accountId)
+            if (next == current) return@withLock false
+            persistLocked(next)
+            true
+        }
+    }
+
     /** Snapshot of the registry, sorted by name, for selection UIs. */
     fun all(): List<Player> = _players.value
 
@@ -221,6 +252,60 @@ fun resolveRename(existing: List<Player>, id: String, newName: String): RenameOu
     if (clash) return RenameOutcome(players = existing, changed = false)
     val next = existing.map { if (it.id == id) it.copy(name = trimmed) else it }
     return RenameOutcome(players = next, changed = true)
+}
+
+/** The player linked to [accountId] in [players], if any. */
+fun findPlayerByAccount(players: List<Player>, accountId: String): Player? =
+    players.firstOrNull { it.accountId == accountId }
+
+/**
+ * Pure account linking: sets [accountId] on player [playerId] and clears it
+ * from every other player that carried the same account, so an account maps
+ * to at most one local player. Returns [existing] unchanged (same instance)
+ * when [playerId] is missing.
+ */
+fun linkPlayerToAccount(existing: List<Player>, playerId: String, accountId: String): List<Player> {
+    if (existing.none { it.id == playerId }) return existing
+    return existing.map {
+        when {
+            it.id == playerId -> it.copy(accountId = accountId)
+            it.accountId == accountId -> it.copy(accountId = null)
+            else -> it
+        }
+    }
+}
+
+/**
+ * Pure get-or-create of the player linked to [accountId]. An already linked
+ * player is returned unchanged (whatever its local name), so repeated calls
+ * never duplicate. Otherwise a new linked player is created named [name]; if
+ * that name is taken by an unrelated local player (who is NOT silently linked —
+ * that would merge histories), it becomes "name (friend)", then
+ * "name (friend 2)", … to keep names unique.
+ */
+fun resolveAccountPlayer(
+    existing: List<Player>,
+    accountId: String,
+    name: String,
+    idGenerator: () -> String,
+): AddPlayerOutcome {
+    findPlayerByAccount(existing, accountId)?.let {
+        return AddPlayerOutcome(players = existing, added = it, changed = false)
+    }
+    val base = name.trim()
+    require(base.isNotEmpty()) { "Player name must not be blank" }
+    val taken = existing.mapTo(HashSet()) { normalizePlayerName(it.name) }
+    var candidate = base
+    var n = 1
+    while (normalizePlayerName(candidate) in taken) {
+        candidate = if (n == 1) "$base (friend)" else "$base (friend $n)"
+        n++
+    }
+    val usedIds = existing.mapTo(HashSet()) { it.id }
+    var id = idGenerator()
+    while (id in usedIds) id = idGenerator()
+    val created = Player(id = id, name = candidate, accountId = accountId)
+    return AddPlayerOutcome(players = existing + created, added = created, changed = true)
 }
 
 /** Pure removal of the player [id] from [existing] (no-op if absent). */

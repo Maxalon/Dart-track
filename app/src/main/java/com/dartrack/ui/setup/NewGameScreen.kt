@@ -39,9 +39,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.dartrack.data.AccountRepository
+import com.dartrack.data.FriendsRepository
 import com.dartrack.data.GameRecord
 import com.dartrack.data.GameRepository
+import com.dartrack.data.PlayerOption
 import com.dartrack.data.PlayerRepository
+import com.dartrack.data.friendsFor
+import com.dartrack.data.playerOptions
 import com.dartrack.model.GameMode
 import com.dartrack.model.GamePlayer
 import com.dartrack.model.Player
@@ -73,8 +78,16 @@ fun NewGameScreen(
     val playerRepo = remember { PlayerRepository.get(context) }
     val scope = rememberCoroutineScope()
 
+    val accountRepo = remember { AccountRepository.get(context) }
+    val friendsRepo = remember { FriendsRepository.get(context) }
+
     LaunchedEffect(Unit) { playerRepo.load() }
     val players by playerRepo.players.collectAsState()
+    val account by accountRepo.account.collectAsState()
+    val friendsCache by friendsRepo.cache.collectAsState()
+    // Local players plus (when logged in) accepted friends from the cached list;
+    // the logged-in user's own "me" player is listed first.
+    val pickOptions = playerOptions(players, friendsFor(friendsCache, account).friends, account?.mePlayerId)
 
     var mode by remember { mutableStateOf(GameMode.X01) }
     // Per-mode options (X01 seeded from the user's saved defaults); the same
@@ -83,6 +96,18 @@ fun NewGameScreen(
     // One choice per seat; start with two empty human seats.
     val seats = remember {
         mutableStateListOf<SeatChoice>(SeatChoice.Human(null), SeatChoice.Human(null))
+    }
+    // Logged in: seat 1 defaults to the "me" player (once, as soon as it's known).
+    var meSeeded by remember { mutableStateOf(false) }
+    val mePlayer = account?.mePlayerId?.let { id -> players.firstOrNull { it.id == id } }
+    LaunchedEffect(mePlayer) {
+        if (meSeeded || mePlayer == null) return@LaunchedEffect
+        meSeeded = true
+        val first = seats.firstOrNull()
+        val alreadySeated = seats.any { it is SeatChoice.Human && it.player?.id == mePlayer.id }
+        if (first is SeatChoice.Human && first.player == null && !alreadySeated) {
+            seats[0] = SeatChoice.Human(mePlayer)
+        }
     }
     // CPU seats only make sense for the solo-friendly scoring modes.
     val botsAllowed = mode == GameMode.X01 || mode == GameMode.COUNT_UP ||
@@ -154,10 +179,21 @@ fun NewGameScreen(
                         is SeatChoice.Human -> SeatPicker(
                             label = "Player ${idx + 1}",
                             selected = seat.player,
-                            allPlayers = players,
+                            options = pickOptions,
                             // Exclude players already chosen in OTHER human seats.
                             takenIds = takenIds - (seat.player?.id?.let { setOf(it) } ?: emptySet()),
-                            onSelect = { seats[idx] = SeatChoice.Human(it) },
+                            onSelect = { option ->
+                                val p = option.player
+                                if (p != null) {
+                                    seats[idx] = SeatChoice.Human(p)
+                                } else {
+                                    // A friend without a local player yet: create it
+                                    // (linked to their account) and seat it.
+                                    scope.launch {
+                                        seats[idx] = SeatChoice.Human(friendsRepo.playerFor(option.friend!!))
+                                    }
+                                }
+                            },
                             onCreate = { query ->
                                 scope.launch {
                                     val created = playerRepo.addPlayer(query)
@@ -275,18 +311,19 @@ fun NewGameScreen(
 
 /**
  * A single seat: an [OutlinedTextField] whose typed text acts as a filter query,
- * with an anchored [ExposedDropdownMenuBox] listing matching registered players
- * (case-insensitive substring), excluding players already chosen in other seats,
- * plus a "Create new player" item at the bottom.
+ * with an anchored [ExposedDropdownMenuBox] listing matching [options]
+ * (registered players and friends, case-insensitive substring; friends carry a
+ * small "friend" label), excluding players already chosen in other seats, plus
+ * a "Create new player" item at the bottom.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SeatPicker(
     label: String,
     selected: Player?,
-    allPlayers: List<Player>,
+    options: List<PlayerOption>,
     takenIds: Set<String>,
-    onSelect: (Player) -> Unit,
+    onSelect: (PlayerOption) -> Unit,
     onCreate: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -300,11 +337,11 @@ private fun SeatPicker(
     }
 
     val trimmed = query.trim()
-    val matches = allPlayers.filter { p ->
-        p.id !in takenIds &&
-            (trimmed.isEmpty() || p.name.contains(trimmed, ignoreCase = true))
+    val matches = options.filter { o ->
+        o.player?.id !in takenIds &&
+            (trimmed.isEmpty() || o.name.contains(trimmed, ignoreCase = true))
     }
-    val exactExists = allPlayers.any { it.name.equals(trimmed, ignoreCase = true) }
+    val exactExists = options.any { it.name.equals(trimmed, ignoreCase = true) }
     val canCreate = trimmed.isNotEmpty() && !exactExists
 
     ExposedDropdownMenuBox(
@@ -329,12 +366,13 @@ private fun SeatPicker(
             expanded = expanded,
             onDismissRequest = { expanded = false },
         ) {
-            matches.forEach { p ->
+            matches.forEach { o ->
                 DropdownMenuItem(
-                    text = { Text(p.name) },
+                    text = { Text(o.name) },
+                    trailingIcon = if (o.isFriend) ({ FriendLabel() }) else null,
                     onClick = {
-                        onSelect(p)
-                        query = p.name
+                        onSelect(o)
+                        query = o.name
                         expanded = false
                     },
                 )
