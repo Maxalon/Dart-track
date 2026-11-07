@@ -249,11 +249,75 @@ the first time, named after their username), so the game records them like any
 other seat. When you're logged in, your own player fills the first seat by
 default.
 
+### Game history sync
+
+Logged in, your game history syncs with the server so it's the same on every
+phone you use and your friends get the games you played together.
+
+- **What syncs:** every game with at least one seat that belongs to an account —
+  you, or a friend you've picked as a player. The whole game goes up exactly as
+  the app stores it (plus the app version and phone model, to help with bugs).
+  Games with only guests and CPUs never leave your phone. A finished game syncs
+  right away; a game still in progress only once nobody has touched it for 24
+  hours (so it doesn't re-upload every turn), and again when it's finished.
+- **When:** on app start, right after a game finishes, when the phone gets a
+  connection back, and when you pull down on **History** or **Friends**. There
+  is no background sync while the app is closed. History shows a quiet
+  "Synced 3 min. ago" line (or why the last sync failed), and Settings →
+  Account has the same line with **Sync now**.
+- **Your first login** uploads all the past games of the player you picked as
+  "you" automatically.
+- **Games from other phones** land in your history. You show up as your own
+  player and friends as their players. Someone who isn't your friend (a friend's
+  other friend) is kept as a hidden player: you see their name in the game, but
+  they never appear in player pickers, player management or stats. The other
+  phone's guests and CPUs keep their names but stay separate from your own
+  players — their "Bob" never merges with yours, and never shows up in your
+  stats.
+- **Deleting** a synced game removes it from **your** history on every phone
+  (offline deletes are sent on the next sync). Friends who played in it keep
+  their copy. Any guests in it simply go with your copy.
+- Sync bookkeeping lives in `<app-files>/sync.json` and belongs to one account:
+  logging in to a different account starts from scratch.
+
+### Moving a guest's games to a friend
+
+Played with someone as a local guest before they had an account? Once you're
+friends, **Manage players → Move a guest's games to a friend** (or **Move
+games** next to the friend on the Friends screen) moves that guest's games to
+them. After confirming ("<N> games of <guest> will move to <friend>. This can't
+be undone from the app."), the guest disappears and those games count as your
+friend's — on your phone and in their history after their next sync. From then
+on they're just a normal friend. You can do this for **one guest per friend**
+(also across your phones); a second attempt is refused with a message. Only
+accepted friends can receive games. **Manage players → Merge players** follows the same rule:
+merging a guest into a friend opens this transfer, two guests merge as before,
+and any other merge into or out of an account-linked player (you, a friend, a
+synced player) is refused.
+
+### Stats with friends
+
+- **Logged out**, the stats screens (Statistics, Player stats, Leaderboards,
+  Achievements) cover every local player, exactly as before.
+- **Logged in**, they cover **you**, your **friends** and your **local guests**.
+  Your own and your guests' numbers are computed on the phone as always. A
+  friend's numbers are **their own all-time stats**, which their app computes
+  over their whole history and shares (they're fetched when a stats screen opens
+  and kept for offline use). The head-to-head between you and a friend is still
+  worked out from the games you share. Hidden players and other phones' guests
+  never appear.
+- After each sync the app shares your own stats with your friends. **Settings →
+  Account → Hide my stats from friends** stops that; friends then see "<you>
+  hides their stats". They still get the games you played together. Your
+  guests' stats are never shared.
+
 ## Local data
 
 - All games (in-progress and finished) are saved to `<app-files>/games.json`,
   the player registry to `players.json`, and tournaments (with their match
-  options) to `tournaments.json`, via `kotlinx.serialization`.
+  options) to `tournaments.json`, via `kotlinx.serialization`. Logged in, the
+  friends list (`friends.json`), friends' shared stats (`friend_stats.json`)
+  and the sync bookkeeping (`sync.json`) are cached next to them.
 - The **history** screen lists every game, lets you resume in-progress games,
   view details, or delete them.
 - **Export / import** — the history screen can export all games as a JSON file
@@ -275,7 +339,7 @@ default.
   3. creates a git tag `v0.1.<count>` and a GitHub Release with the APK attached
      as `dart-track-0.1.<count>.apk`.
 
-Unit tests live under `app/src/test/` — roughly **590** JVM tests — and cover
+Unit tests live under `app/src/test/` — roughly **680** JVM tests — and cover
 the game-mode rules of every mode (X01 bust/finish/undo and stat math, Cricket
 scoring/win conditions including Cut-Throat, Half-It halving, Killer's
 arm/drain/self-kill knockout and draw logic, Bermuda's target ladder and
@@ -283,8 +347,12 @@ halving, Count-Up, Checkout Trainer, Baseball, Golf, Gotcha and the rest of the
 practice suite), the **CPU opponent** (its calibration and X01/Count-Up/Cricket
 integration, including full bot-vs-bot Cricket games), the **sound/haptic feedback** module (its event mapping and
 procedural tone specs), **achievements**, **leaderboards & records**,
-**settings** encode/decode, the player registry, and JSON persistence
-round-trips. Run them with `./gradlew :app:testDebugUnitTest`.
+**settings** encode/decode, the player registry, JSON persistence
+round-trips, and the **account features**: the server client (against a mock
+web server), friends, game-history **sync** (what uploads and with whom,
+downloaded games for every mode, deletes, guest transfers — including an
+end-to-end run of two phones against an in-memory fake server) and which stats
+are shown logged in vs. out. Run them with `./gradlew :app:testDebugUnitTest`.
 
 ## APK install
 

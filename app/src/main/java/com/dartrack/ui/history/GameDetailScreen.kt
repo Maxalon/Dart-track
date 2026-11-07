@@ -30,6 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dartrack.data.GameRepository
+import com.dartrack.data.SyncManager
 import com.dartrack.data.SettingsRepository
 import com.dartrack.model.GameMode
 import com.dartrack.model.AROUND_CLOCK_LAST_TARGET
@@ -76,7 +77,9 @@ fun GameDetailScreen(
     // away; when on, route through the confirmation dialog below.
     fun deleteGame() {
         scope.launch {
-            repo.delete(recordId)
+            // Through sync: a synced game is also removed from this account's
+            // server history (queued while offline). Friends keep their copy.
+            SyncManager.get(context).deleteGame(recordId)
             onBack()
         }
     }

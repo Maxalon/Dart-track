@@ -40,9 +40,17 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.dartrack.data.AccountRepository
+import com.dartrack.data.FriendsRepository
 import com.dartrack.data.GameRepository
+import com.dartrack.data.MergeDecision
 import com.dartrack.data.PlayerRepository
+import com.dartrack.data.friendsFor
+import com.dartrack.data.mergeDecision
+import com.dartrack.net.FriendEntry
 import com.dartrack.data.normalizePlayerName
+import com.dartrack.data.transferableGuests
+import com.dartrack.data.visiblePlayers
 import com.dartrack.model.Player
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
@@ -52,7 +60,11 @@ import androidx.compose.runtime.rememberCoroutineScope
  * registry from [PlayerRepository]; mutations run on a coroutine scope and
  * surface a brief Toast. Merge reassigns a source player's games to a target
  * (via [PlayerRepository.merge] -> [GameRepository.reassignPlayer]) then drops
- * the source from the registry.
+ * the source from the registry. Logged in, "Move a guest's games to a friend"
+ * opens [TransferGuestDialog]. Hidden players (synced strangers) aren't listed.
+ * Merge follows [mergeDecision]: guest → guest merges locally; guest → friend
+ * becomes the (server-logged, one-per-friend) transfer; anything else touching
+ * an account-linked player is refused.
  */
 @Composable
 fun PlayerManagementScreen(onBack: () -> Unit) {
@@ -61,7 +73,18 @@ fun PlayerManagementScreen(onBack: () -> Unit) {
     val gameRepo = remember { GameRepository.get(context) }
     val scope = rememberCoroutineScope()
 
-    val players by playerRepo.players.collectAsState()
+    val allPlayers by playerRepo.players.collectAsState()
+    val players = visiblePlayers(allPlayers)
+    val accountRepo = remember { AccountRepository.get(context) }
+    val friendsRepo = remember { FriendsRepository.get(context) }
+    val account by accountRepo.account.collectAsState()
+    val friendsCache by friendsRepo.cache.collectAsState()
+    val canTransfer = account != null &&
+        friendsFor(friendsCache, account).friends.isNotEmpty() &&
+        transferableGuests(allPlayers, account?.mePlayerId).isNotEmpty()
+    var showTransfer by remember { mutableStateOf(false) }
+    // Guest → friend chosen in "Merge players": handed to the transfer flow.
+    var mergeTransfer by remember { mutableStateOf<Pair<String, FriendEntry>?>(null) }
 
     var renameTarget by remember { mutableStateOf<Player?>(null) }
     var deleteTarget by remember { mutableStateOf<Player?>(null) }
@@ -100,6 +123,14 @@ fun PlayerManagementScreen(onBack: () -> Unit) {
             modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
         ) {
             Text("Merge players")
+        }
+        if (canTransfer) {
+            OutlinedButton(
+                onClick = { showTransfer = true },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+            ) {
+                Text("Move a guest's games to a friend")
+            }
         }
         Spacer(Modifier.height(8.dp))
 
@@ -157,15 +188,43 @@ fun PlayerManagementScreen(onBack: () -> Unit) {
         )
     }
 
+    if (showTransfer) {
+        TransferGuestDialog(
+            onDismiss = { showTransfer = false },
+            onDone = { msg ->
+                showTransfer = false
+                toast(msg)
+            },
+        )
+    }
+
+    mergeTransfer?.let { (guestId, friend) ->
+        TransferGuestDialog(
+            initialFriend = friend,
+            initialGuestId = guestId,
+            onDismiss = { mergeTransfer = null },
+            onDone = { msg ->
+                mergeTransfer = null
+                toast(msg)
+            },
+        )
+    }
+
     if (showMerge) {
+        val friends = friendsFor(friendsCache, account).friends
         MergeDialog(
             players = players,
+            decide = { from, into -> mergeDecision(from, into, friends) },
             onDismiss = { showMerge = false },
             onConfirm = { from, into ->
                 showMerge = false
-                scope.launch {
-                    val moved = playerRepo.merge(from.id, into.id, gameRepo)
-                    toast("Merged ${from.name} into ${into.name} ($moved games moved)")
+                when (val decision = mergeDecision(from, into, friends)) {
+                    MergeDecision.Allowed -> scope.launch {
+                        val moved = playerRepo.merge(from.id, into.id, gameRepo)
+                        toast("Merged ${from.name} into ${into.name} ($moved games moved)")
+                    }
+                    is MergeDecision.Transfer -> mergeTransfer = from.id to decision.friend
+                    is MergeDecision.Blocked -> toast(decision.message)
                 }
             },
         )
@@ -243,12 +302,15 @@ private fun RenameDialog(
 @Composable
 private fun MergeDialog(
     players: List<Player>,
+    decide: (from: Player, into: Player) -> MergeDecision,
     onDismiss: () -> Unit,
     onConfirm: (from: Player, into: Player) -> Unit,
 ) {
     var from by remember { mutableStateOf<Player?>(null) }
     var into by remember { mutableStateOf<Player?>(null) }
-    val valid = from != null && into != null && from!!.id != into!!.id
+    val distinct = from != null && into != null && from!!.id != into!!.id
+    val decision = if (distinct) decide(from!!, into!!) else null
+    val valid = distinct && decision !is MergeDecision.Blocked
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -282,13 +344,29 @@ private fun MergeDialog(
                         fontSize = 12.sp,
                     )
                 }
+                when (decision) {
+                    is MergeDecision.Blocked -> {
+                        Spacer(Modifier.height(4.dp))
+                        Text(decision.message, color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
+                    }
+                    is MergeDecision.Transfer -> {
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "${into!!.name} is your friend: this moves ${from!!.name}'s games to their account " +
+                                "(one guest per friend).",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 12.sp,
+                        )
+                    }
+                    else -> Unit
+                }
             }
         },
         confirmButton = {
             TextButton(
                 onClick = { onConfirm(from!!, into!!) },
                 enabled = valid,
-            ) { Text("Merge") }
+            ) { Text(if (decision is MergeDecision.Transfer) "Next" else "Merge") }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancel") }

@@ -15,6 +15,7 @@ import com.dartrack.model.KillerState
 import com.dartrack.model.ShanghaiState
 import com.dartrack.model.X01State
 import com.dartrack.model.X01Stats
+import kotlinx.serialization.Serializable
 
 /**
  * Per-player statistics keyed by the stable player [id] (UUID) rather than by
@@ -37,7 +38,11 @@ import com.dartrack.model.X01Stats
  * [total] is the number of X01 turns considered (the denominator for the
  * percentages). Each `pct*` field is the matching count divided by [total]
  * (0.0..1.0), or 0.0 when there are no turns.
+ *
+ * This and the other stats payloads are @Serializable because the "me" player's
+ * stats are uploaded as a snapshot for friends to read (see [StatsSnapshot]).
  */
+@Serializable
 data class ScoreBandDistribution(
     val total: Int,
     /** entered == 0 or a busted turn (scores 0). */
@@ -71,6 +76,7 @@ data class ScoreBandDistribution(
 }
 
 /** Per-mode (non-X01) summary for one player. */
+@Serializable
 data class ModeSummary(
     val gamesPlayed: Int,
     val gamesWon: Int,
@@ -96,6 +102,7 @@ data class ModeSummary(
 )
 
 /** The full computed stats payload for a single player. */
+@Serializable
 data class PlayerStatsData(
     val playerId: String,
     // Overall (all modes).

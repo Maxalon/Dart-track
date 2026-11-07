@@ -30,11 +30,15 @@ import java.io.File
  * Single-file JSON repository for completed and in-progress games.
  * For personal use this scales fine into the hundreds of games.
  */
-class GameRepository private constructor(private val file: File) {
+class GameRepository internal constructor(private val file: File) {
 
     private val mutex = Mutex()
     private val _games = MutableStateFlow<List<GameRecord>>(emptyList())
     val games: StateFlow<List<GameRecord>> = _games.asStateFlow()
+
+    /** True once [load] has read the file (sync must not write before that). */
+    @Volatile var isLoaded: Boolean = false
+        private set
 
     /**
      * Loads the games store. The store is a versioned envelope ([GameStore]);
@@ -46,6 +50,7 @@ class GameRepository private constructor(private val file: File) {
      */
     suspend fun load() = withContext(Dispatchers.IO) {
         mutex.withLock {
+            isLoaded = true
             if (!file.exists()) {
                 _games.value = emptyList()
                 return@withLock
@@ -117,6 +122,20 @@ class GameRepository private constructor(private val file: File) {
             }
         }
 
+    /**
+     * Sync's one write per downloaded page / upload batch: [upserts] replace or
+     * add records by id, [removals] are deleted. No-op (no write) when both are
+     * empty or nothing actually changes.
+     */
+    suspend fun applySync(upserts: List<GameRecord>, removals: Set<String>) = withContext(Dispatchers.IO) {
+        if (upserts.isEmpty() && removals.isEmpty()) return@withContext
+        mutex.withLock {
+            val current = _games.value
+            val next = mergeSyncChanges(current, upserts, removals)
+            if (next != current) persistLocked(next)
+        }
+    }
+
     suspend fun delete(id: String) = withContext(Dispatchers.IO) {
         mutex.withLock {
             val list = _games.value.filterNot { it.id == id }
@@ -154,6 +173,14 @@ class GameRepository private constructor(private val file: File) {
 // ---------------------------------------------------------------------------
 // Pure, Android-free logic for player reassignment (unit-testable).
 // ---------------------------------------------------------------------------
+
+/** [current] with [upserts] replacing/adding by id and [removals] dropped (order kept). */
+fun mergeSyncChanges(current: List<GameRecord>, upserts: List<GameRecord>, removals: Set<String>): List<GameRecord> {
+    val incoming = upserts.associateBy { it.id }
+    val replaced = current.filterNot { it.id in removals }.map { incoming[it.id] ?: it }
+    val known = replaced.mapTo(HashSet()) { it.id }
+    return replaced + upserts.filter { it.id !in known && it.id !in removals }
+}
 
 /**
  * Returns a copy of this state with its [GameState.players] seat list replaced.

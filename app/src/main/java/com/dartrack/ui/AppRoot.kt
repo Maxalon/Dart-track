@@ -27,13 +27,19 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.dartrack.data.AccountRepository
+import com.dartrack.data.FriendStatsRepository
+import com.dartrack.data.FriendStatsStatus
 import com.dartrack.data.FriendsRepository
 import com.dartrack.data.GameRepository
 import com.dartrack.data.friendsFor
 import com.dartrack.data.PlayerRepository
 import com.dartrack.data.SettingsRepository
+import com.dartrack.data.SyncManager
+import com.dartrack.data.achievementStatuses
 import com.dartrack.data.achievementSummary
 import com.dartrack.data.achievementsFor
+import com.dartrack.data.friendStatsFor
+import com.dartrack.data.statsSubjects
 import com.dartrack.ui.account.AccountScreen
 import com.dartrack.ui.account.AccountSection
 import com.dartrack.ui.account.MePlayerDialog
@@ -75,8 +81,6 @@ fun AppRoot() {
     val repo = GameRepository.get(context)
     val nav = rememberNavController()
 
-    LaunchedEffect(Unit) { repo.load() }
-
     val appVm: AppViewModel = viewModel(factory = AppViewModel.Factory(repo))
     val games by appVm.games.collectAsState()
 
@@ -95,15 +99,33 @@ fun AppRoot() {
     val accountNotice by accountRepo.notice.collectAsState()
     val friendsRepo = remember { FriendsRepository.get(context) }
     val friendsCache by friendsRepo.cache.collectAsState()
+    val sync = remember { SyncManager.get(context) }
+    // Everything is read from disk before sync may start, so a sync can never
+    // write over a store that hasn't been loaded yet.
+    var storesLoaded by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
+        repo.load()
         registry.load()
         friendsRepo.load()
         accountRepo.load()
-        if (accountRepo.account.value != null) accountRepo.refreshMe()
+        sync.load()
+        storesLoaded = true
+        // Automatic triggers: a game finishing, connectivity returning.
+        sync.start(context)
     }
-    // Friends (and the Home badge count) refresh on app start and after a login.
+    // Game-history sync on app start, after a login and once "which player is
+    // you?" is answered (sync needs the me player).
+    LaunchedEffect(storesLoaded, account?.userId, account?.mePlayerId) {
+        if (storesLoaded && account?.mePlayerId != null) sync.requestSync()
+    }
+    // Friends (and the Home badge count) refresh on app start and after a login;
+    // so does the profile (also how a revoked token is noticed, and where the
+    // "hide my stats" flag comes from).
     LaunchedEffect(account?.userId) {
-        if (account != null) friendsRepo.refresh()
+        if (account != null) {
+            accountRepo.refreshMe()
+            friendsRepo.refresh()
+        }
     }
     // "Which player is you?" right after a login that found no linked player.
     // "Later" hides it for this login; Settings → Account can still choose.
@@ -310,15 +332,26 @@ fun AppRoot() {
                 // name still shows even if the registry has not loaded), then a
                 // generic label as a last resort.
                 val playerRepo = remember { PlayerRepository.get(context) }
-                LaunchedEffect(Unit) { playerRepo.load() }
                 val players by playerRepo.players.collectAsState()
-                val playerName = players.firstOrNull { it.id == playerId }?.name
+                val friendStatsCache by remember { FriendStatsRepository.get(context) }.cache.collectAsState()
+                // Logged in, a friend's board comes from the snapshot they shared.
+                val subject = statsSubjects(players, account, friendsFor(friendsCache, account).friends)
+                    .firstOrNull { it.player.id == playerId }
+                val snapshot = subject?.takeIf { it.isFriend }?.player?.accountId
+                    ?.let { friendStatsFor(friendStatsCache, account?.userId)[it] }
+                    ?.takeIf { it.status == FriendStatsStatus.OK }?.snapshot
+                val playerName = subject?.player?.name
+                    ?: players.firstOrNull { it.id == playerId }?.name
                     ?: games.firstNotNullOfOrNull { rec ->
                         rec.state.players.firstOrNull { it.id == playerId }?.name
                     }
                     ?: "Player"
-                val statuses = remember(games, playerId) { achievementsFor(playerId, games) }
-                val summary = remember(games, playerId) { achievementSummary(playerId, games) }
+                val statuses = remember(games, playerId, snapshot) {
+                    snapshot?.achievementStatuses() ?: achievementsFor(playerId, games)
+                }
+                val summary = remember(games, playerId, snapshot) {
+                    snapshot?.achievementSummary() ?: achievementSummary(playerId, games)
+                }
                 AchievementsScreen(
                     playerName = playerName,
                     statuses = statuses,

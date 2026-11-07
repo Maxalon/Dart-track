@@ -21,6 +21,7 @@ import java.io.File
 /**
  * The device's logged-in server account. [mePlayerId] is the local [Player]
  * that represents this user ("which player is you?"); null until chosen.
+ * [statsHidden] mirrors the server's "hide my stats from friends" flag.
  */
 @Serializable
 data class Account(
@@ -28,6 +29,7 @@ data class Account(
     val userId: String,
     val username: String,
     val mePlayerId: String? = null,
+    val statsHidden: Boolean = false,
 )
 
 /**
@@ -43,7 +45,7 @@ data class Account(
  * authenticated call answers 401, which means an admin reset or deleted the
  * account: then the token is dropped and [notice] carries a one-off message.
  */
-class AccountRepository private constructor(
+class AccountRepository internal constructor(
     private val file: File,
     /** Shared server client (FriendsRepository calls through [authed] with it). */
     val api: ApiClient,
@@ -95,8 +97,18 @@ class AccountRepository private constructor(
     suspend fun refreshMe(): ApiResult<Unit> {
         val result = authed { api.me(it) }
         if (result is ApiResult.Ok) {
-            update { it.copy(username = result.value.username) }
+            update { it.copy(username = result.value.username, statsHidden = result.value.statsHidden) }
         }
+        return when (result) {
+            is ApiResult.Ok -> ApiResult.Ok(Unit)
+            is ApiResult.Failure -> result
+        }
+    }
+
+    /** "Hide my stats from friends" (`PATCH /v1/me`); stored locally once the server agrees. */
+    suspend fun setStatsHidden(hidden: Boolean): ApiResult<Unit> {
+        val result = authed { api.setStatsHidden(it, hidden) }
+        if (result is ApiResult.Ok) update { it.copy(statsHidden = result.value.statsHidden) }
         return when (result) {
             is ApiResult.Ok -> ApiResult.Ok(Unit)
             is ApiResult.Failure -> result
@@ -204,7 +216,7 @@ fun decodeAccount(text: String): Account? {
 
 /**
  * Players offered by the "which player is you?" picker for account [userId]:
- * every local player not already linked to a DIFFERENT account.
+ * every visible local player not already linked to a DIFFERENT account.
  */
 fun eligibleMePlayers(players: List<Player>, userId: String): List<Player> =
-    players.filter { it.accountId == null || it.accountId == userId }
+    players.filter { !it.hidden && (it.accountId == null || it.accountId == userId) }
